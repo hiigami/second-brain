@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Proposed model review</title></head><body>
+<h1>Proposed customer/order model — pending review</h1>
+<h2>ER diagram</h2>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100">
+  <defs><marker id="er-arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="10" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L10,3.5 L0,7 Z" fill="black"/></marker></defs>
+  <rect x="10" y="25" width="120" height="50" fill="white" stroke="black"/>
+  <text x="30" y="55" fill="black" font-size="18">Customer</text>
+  <rect x="270" y="25" width="120" height="50" fill="white" stroke="black"/>
+  <text x="300" y="55" fill="black" font-size="18">Order</text>
+  <line x1="130" y1="50" x2="270" y2="50" stroke="black" marker-end="url(#er-arrow)"/>
+  <text x="185" y="35" fill="black" font-size="18">1:N</text>
+</svg>
+<h2>Entity and relevant values</h2><table><caption>Proposed field definition</caption><tr><th>Entity</th><th>Column</th><th>Type</th><th>Sample value</th><th>Unit</th><th>Status</th></tr><tr><td>Order</td><td>total</td><td>decimal</td><td>10.20</td><td>USD</td><td>proposed</td></tr></table>
+<h2>Relationship definition</h2><p>Proposed Customer.id to Order.customer_id relationship: one customer may have many orders; pending review.</p>
+<h2>Integration Alpha query</h2><pre><code>SELECT customer_id, total FROM orders WHERE state = 'active';</code></pre>
+<h2>Tracked model changes</h2><table><tr><th>Version</th><th>Effective date</th><th>Change</th><th>Status</th></tr><tr><td>v2</td><td>2026-09-01</td><td>total added</td><td>pending</td></tr></table>
+<h2>Proposed state diagram</h2>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100">
+  <defs><marker id="state-arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="10" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L10,3.5 L0,7 Z" fill="black"/></marker></defs>
+  <rect x="10" y="25" width="120" height="50" fill="white" stroke="black"/>
+  <text x="40" y="55" fill="black" font-size="18">draft</text>
+  <rect x="270" y="25" width="120" height="50" fill="white" stroke="black"/>
+  <text x="300" y="55" fill="black" font-size="18">active</text>
+  <line x1="130" y1="50" x2="270" y2="50" stroke="black" marker-end="url(#state-arrow)"/>
+  <text x="170" y="35" fill="black" font-size="18">approve</text>
+</svg>
+<p>Both diagrams and the effective date are proposals, not approved business changes.</p>
+</body></html>

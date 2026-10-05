@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "segments",
+  "type": "object",
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "project_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+    "run_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "segment_id": {"type": "string", "pattern": "^S-[a-f0-9]{24}$"},
+          "evidence_id": {"type": "string", "pattern": "^E-[a-f0-9]{24}$"},
+          "representation_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "content_type": {"type": "string", "enum": ["source_text", "unclassified", "heading", "paragraph", "list_item", "table_cell", "table_header", "table_row", "caption", "code", "quote", "image_alt", "resource_reference", "email_header", "email_body", "email_quote", "attachment_metadata", "diagram_label", "diagram_caption", "vector_geometry", "image_region", "image_annotation", "embedded_asset"]},
+          "original_locator": {"type": "string", "minLength": 1},
+          "line_start": {"type": "integer", "minimum": 1},
+          "line_end": {"type": "integer", "minimum": 1},
+          "line_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "extraction_status": {"type": "string", "enum": ["source_text", "extracted_needs_review"]},
+          "dependencies": {"type": "array", "items": {"type": "string", "pattern": "^S-[a-f0-9]{24}$"}, "uniqueItems": true}
+        },
+        "required": ["segment_id", "evidence_id", "representation_sha256", "content_type",
+                     "original_locator", "line_start", "line_end", "line_sha256",
+                     "extraction_status", "dependencies"],
+        "additionalProperties": false
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evidence_id": {"type": "string", "pattern": "^E-[a-f0-9]{24}$"},
+          "code": {"type": "string", "minLength": 1},
+          "detail": {"type": "string", "minLength": 1},
+          "locator": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+          "status": {"type": "string", "enum": ["unavailable", "review_required"]}
+        },
+        "required": ["evidence_id", "code", "detail", "locator", "status"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["schema_version", "project_id", "run_id", "segments", "issues"],
+  "additionalProperties": false
+}

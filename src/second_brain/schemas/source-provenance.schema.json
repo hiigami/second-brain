@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "source-provenance",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+          },
+          "relative_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "origin": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "google_docs",
+                  "google_drive",
+                  "local_file",
+                  "repository",
+                  "other"
+                ]
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "revision": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "captured_at": {
+                "type": "string",
+                "minLength": 20
+              },
+              "features": {
+                "type": "object",
+                "properties": {
+                  "tabs": {
+                    "type": "string",
+                    "enum": [
+                      "preserved",
+                      "not_preserved",
+                      "unknown",
+                      "not_applicable"
+                    ]
+                  },
+                  "comments": {
+                    "type": "string",
+                    "enum": [
+                      "preserved",
+                      "not_preserved",
+                      "unknown",
+                      "not_applicable"
+                    ]
+                  },
+                  "suggestions": {
+                    "type": "string",
+                    "enum": [
+                      "preserved",
+                      "not_preserved",
+                      "unknown",
+                      "not_applicable"
+                    ]
+                  }
+                },
+                "required": [
+                  "tabs",
+                  "comments",
+                  "suggestions"
+                ],
+                "additionalProperties": false
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0
+              },
+              "authorship": {
+                "type": "string",
+                "enum": [
+                  "human",
+                  "ai_generated",
+                  "mixed",
+                  "unknown"
+                ],
+                "description": "Optional. Who authored the exported content; ai_generated/mixed raise an ai_generated_source warning."
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$",
+                "description": "Optional. Exact bytes this provenance describes; a mismatch blocks capture (stale metadata)."
+              },
+              "content_date": {
+                "type": "string",
+                "minLength": 10,
+                "description": "Optional. When the content was authored/held (ISO date or timestamp with timezone). Overrides filename dates."
+              },
+              "revised_at": {
+                "type": "string",
+                "minLength": 20,
+                "description": "Optional. Upstream revision time (Drive modifiedTime, commit time)."
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "url",
+              "revision",
+              "captured_at",
+              "features",
+              "limitations"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "source_id",
+          "relative_path",
+          "origin"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    }
+  },
+  "required": [
+    "schema_version",
+    "entries"
+  ],
+  "additionalProperties": false
+}

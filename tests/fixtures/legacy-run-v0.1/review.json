@@ -1,0 +1,28 @@
+{
+  "schema_version": "0.1",
+  "project_id": "demo",
+  "run_id": "build-demo-final",
+  "decision": "changes_requested",
+  "reviewer": "",
+  "reviewed_at": null,
+  "manifest_sha256": "59576bcfbe13facf98aa51b219e6817a632d2658e39333f38c5c0df97020f1a4",
+  "records_sha256": "dad5dfec0721be06a898952c7e508077078f059da51c1ac039e0756dffcf7d02",
+  "previous_release_id": null,
+  "approved_record_ids": [
+    "DEC-001",
+    "INV-001",
+    "REQ-001",
+    "REQ-002",
+    "UNC-001"
+  ],
+  "removed_record_ids": [],
+  "acknowledged_issue_codes": [],
+  "checks": {
+    "evidence_support": false,
+    "conflicts_explicit": false,
+    "source_authority_checked": false,
+    "privacy_checked": false,
+    "snapshot_completeness_checked": false
+  },
+  "notes": "Human review required. Do not ask an agent to complete or approve this review."
+}

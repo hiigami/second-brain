@@ -1,0 +1,194 @@
+{
+  "status": "passed",
+  "checked_at": "2026-09-30T20:35:03.943415+00:00",
+  "environment": {
+    "platform": "linux",
+    "python": "3.13.5"
+  },
+  "clean_archive_extraction": true,
+  "commands_checked": 16,
+  "all_expected_exit_codes_observed": true,
+  "source_files_byte_unchanged": true,
+  "pending_review_publication_blocked": true,
+  "human_approval_performed": false,
+  "real_client_data_used": false,
+  "model_calls_performed": 0,
+  "commands": [
+    {
+      "arguments": [
+        "tools/kb_verify_bundle.py"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_demo.py",
+        "--run-id",
+        "clean-smoke-001"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_check.py",
+        "--run",
+        "projects/demo/runs/clean-smoke-001",
+        "--stage2",
+        "--live"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_publish.py",
+        "--project",
+        "projects/demo/config/project.json",
+        "--run",
+        "projects/demo/runs/clean-smoke-001",
+        "--review",
+        "projects/demo/runs/clean-smoke-001/review.pending.json",
+        "--human-approved"
+      ],
+      "expected_exit": 2,
+      "actual_exit": 2,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_init.py",
+        "--project-id",
+        "cli-pilot",
+        "--name",
+        "Synthetic CLI pilot",
+        "--source",
+        "requirements:requirements:/mnt/data/stage2-clean-l8syloll/work-second-brain-stage2/fixtures/demo-sources/requirements",
+        "--source",
+        "architecture:architecture:/mnt/data/stage2-clean-l8syloll/work-second-brain-stage2/fixtures/demo-sources/architecture",
+        "--source",
+        "meetings:meetings:/mnt/data/stage2-clean-l8syloll/work-second-brain-stage2/fixtures/demo-sources/meetings",
+        "--source",
+        "sql:sql:/mnt/data/stage2-clean-l8syloll/work-second-brain-stage2/fixtures/demo-sources/sql",
+        "--source",
+        "repository:repository:/mnt/data/stage2-clean-l8syloll/work-second-brain-stage2/fixtures/demo-sources/repository"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_inventory.py",
+        "--project",
+        "projects/cli-pilot/config/project.json",
+        "--run-id",
+        "smoke-001"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_packet.py",
+        "--run",
+        "projects/cli-pilot/runs/smoke-001"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_check.py",
+        "--run",
+        "projects/cli-pilot/runs/smoke-001",
+        "--inventory-only"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_init.py",
+        "--help"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_inventory.py",
+        "--help"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_packet.py",
+        "--help"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_check.py",
+        "--help"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_publish.py",
+        "--help"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_demo.py",
+        "--help"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    },
+    {
+      "arguments": [
+        "tools/kb_verify_bundle.py",
+        "--help"
+      ],
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "passed": true
+    }
+  ]
+}

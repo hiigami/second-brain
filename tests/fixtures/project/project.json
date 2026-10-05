@@ -1,0 +1,84 @@
+{
+  "schema_version": "0.1",
+  "project": {
+    "id": "demo",
+    "name": "Synthetic Stage 2 demo",
+    "description": "Synthetic example only."
+  },
+  "sources": [
+    {
+      "id": "requirements",
+      "type": "requirements",
+      "path": "/REPLACED_BY_TESTS/requirements",
+      "include": [
+        "**/*.md",
+        "**/*.txt",
+        "**/*.json"
+      ],
+      "exclude": []
+    },
+    {
+      "id": "architecture",
+      "type": "architecture",
+      "path": "/REPLACED_BY_TESTS/architecture",
+      "include": [
+        "**/*.md",
+        "**/*.txt",
+        "**/*.json"
+      ],
+      "exclude": []
+    },
+    {
+      "id": "meetings",
+      "type": "meetings",
+      "path": "/REPLACED_BY_TESTS/meetings",
+      "include": [
+        "**/*.md",
+        "**/*.txt",
+        "**/*.json"
+      ],
+      "exclude": []
+    },
+    {
+      "id": "sql",
+      "type": "sql",
+      "path": "/REPLACED_BY_TESTS/sql",
+      "include": [
+        "**/*.sql",
+        "**/*.md"
+      ],
+      "exclude": []
+    },
+    {
+      "id": "repository",
+      "type": "repository",
+      "path": "/REPLACED_BY_TESTS/repository",
+      "include": [
+        "src/**",
+        "tests/**",
+        "docs/**"
+      ],
+      "exclude": []
+    }
+  ],
+  "global_exclude": [
+    "**/.git/**",
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/venv/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/__pycache__/**",
+    "**/.pytest_cache/**",
+    "**/.mypy_cache/**",
+    "**/.idea/**",
+    "**/.vscode/**"
+  ],
+  "knowledge": {
+    "path": "knowledge",
+    "approved": "knowledge/approved"
+  },
+  "runs": {
+    "path": "runs"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "intake-review",
+  "type": "object",
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "item_id": {"type": "string", "pattern": "^INT-[a-f0-9]{24}$"},
+    "origin_review_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "decision": {"enum": ["accept", "decline", "defer"]},
+    "reviewer": {"type": "string", "minLength": 1},
+    "reviewed_at": {"type": "string", "minLength": 1},
+    "reason": {"type": "string", "minLength": 1},
+    "capture_authorization": {"anyOf": [{"type": "null"}, {"type": "object", "properties": {
+      "mode": {"enum": ["full_file", "scoped_export"]},
+      "path": {"type": "string", "minLength": 1},
+      "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "reason": {"type": "string", "minLength": 1}
+    }, "required": ["mode", "path", "sha256", "reason"], "additionalProperties": false}]}
+  },
+  "required": ["schema_version", "item_id", "origin_review_sha256", "decision", "reviewer", "reviewed_at", "reason", "capture_authorization"],
+  "additionalProperties": false
+}

@@ -1,0 +1,818 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "manifest",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "tool_version": {
+      "type": "string",
+      "enum": [
+        "0.1.0",
+        "0.2.0",
+        "0.2.1",
+        "0.3.0",
+        "0.4.0"
+      ]
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 20
+    },
+    "config_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "scope_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "capture_policy": {
+      "description": "Versioned engine-owned capture inputs, frozen for runs created with tool 0.2.1 or later. Historical runs omit this field and use the fixed legacy lookup.",
+      "type": "object",
+      "properties": {
+        "version": {"const": "1"},
+        "supported_extensions": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^\\.[a-z0-9]+$"}
+        },
+        "secret_patterns": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "required": ["version", "supported_extensions", "secret_patterns"],
+      "additionalProperties": false
+    },
+    "config_snapshot": {
+      "const": "project.snapshot.json"
+    },
+    "source_scope": {
+      "description": "Present only when an additive source-scope sidecar was captured. The named snapshot is bound to the scope fingerprint.",
+      "type": "object",
+      "properties": {
+        "path": {"const": "source-scope.snapshot.json"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      },
+      "required": ["path", "sha256"],
+      "additionalProperties": false
+    },
+    "segment_inventory": {
+      "description": "Frozen v1 locators and extraction issues for engine 0.4.0 runs.",
+      "type": "object",
+      "properties": {
+        "path": {"const": "segments.snapshot.json"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "count": {"type": "integer", "minimum": 0}
+      },
+      "required": ["path", "sha256", "count"],
+      "additionalProperties": false
+    },
+    "documents": {
+      "description": "Present only when the run captured documents (--documents). Must equal the documents component of the scope fingerprint; text-only runs omit this key.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "const": true
+        },
+        "adapter_version": {
+          "type": "string", "minLength": 1
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\.[a-z0-9]+$"
+          },
+          "uniqueItems": true
+        },
+        "allow_legacy_ppt": {
+          "type": "boolean"
+        },
+        "soffice": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "csv_encoding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "csv_delimiter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "csv_representation": {"type": "string", "enum": ["raw", "structured"]},
+        "csv_header": {"type": "string", "enum": ["none", "first-row"]},
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "adapter_limits": {
+          "type": "object",
+          "required": []
+        }
+      },
+      "required": [
+        "enabled",
+        "extensions",
+        "allow_legacy_ppt",
+        "soffice",
+        "csv_encoding",
+        "csv_delimiter",
+        "timeout_seconds",
+        "adapter_limits"
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "blocked"
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "max_file_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_total_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_files": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "max_file_bytes",
+        "max_total_bytes",
+        "max_files"
+      ],
+      "additionalProperties": false
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "requirements",
+              "architecture",
+              "meetings",
+              "sql",
+              "repository",
+              "data",
+              "analysis",
+              "policy"
+            ]
+          },
+          "root": {
+            "type": "string",
+            "minLength": 1
+          },
+          "eligible_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "excluded_entries": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "root",
+          "eligible_count",
+          "excluded_entries"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^E-[a-f0-9]{24}$"
+          },
+          "logical_id": {
+            "type": "string",
+            "pattern": "^F-[a-f0-9]{24}$"
+          },
+          "source_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+          },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "requirements",
+              "architecture",
+              "meetings",
+              "sql",
+              "repository",
+              "data",
+              "analysis",
+              "policy"
+            ]
+          },
+          "relative_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "representation": {
+            "description": "Versioned identity of the quotable text; mandatory for engine 0.4.0 runs. Derived text also binds extractor and parser versions and options.",
+            "type": "object",
+            "properties": {
+              "version": {"const": "1"},
+              "kind": {"type": "string", "enum": ["source_text", "derived_text"]},
+              "text_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+              "identity_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+            },
+            "required": ["version", "kind", "text_sha256", "identity_sha256"],
+            "additionalProperties": false
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "line_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "encoding": {
+            "const": "utf-8"
+          },
+          "snapshot_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "document": {
+            "type": "object",
+            "description": "Present only for files captured through the document extractor. sha256/bytes above describe the frozen original binary; snapshot_path/line_count/encoding above describe the derived UTF-8 text.",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "extracted_needs_review"
+                ]
+              },
+              "media_type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "original_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "original_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "original_snapshot_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text_snapshot_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "text_bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "text_line_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "metadata_snapshot_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "metadata_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "adapter_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "parsers": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": []
+              },
+              "segment_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "warning"
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "locator": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "severity",
+                    "code",
+                    "detail"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 0
+              },
+              "options_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "status",
+              "media_type",
+              "original_sha256",
+              "original_bytes",
+              "original_snapshot_path",
+              "text_snapshot_path",
+              "text_sha256",
+              "text_bytes",
+              "text_line_count",
+              "metadata_snapshot_path",
+              "metadata_sha256",
+              "adapter_version",
+              "parsers",
+              "segment_count",
+              "issues",
+              "options_sha256"
+            ],
+            "additionalProperties": false
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "google_docs",
+                      "google_drive",
+                      "local_file",
+                      "repository",
+                      "other"
+                    ]
+                  },
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "url": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "revision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "captured_at": {
+                    "type": "string",
+                    "minLength": 20
+                  },
+                  "features": {
+                    "type": "object",
+                    "properties": {
+                      "tabs": {
+                        "type": "string",
+                        "enum": [
+                          "preserved",
+                          "not_preserved",
+                          "unknown",
+                          "not_applicable"
+                        ]
+                      },
+                      "comments": {
+                        "type": "string",
+                        "enum": [
+                          "preserved",
+                          "not_preserved",
+                          "unknown",
+                          "not_applicable"
+                        ]
+                      },
+                      "suggestions": {
+                        "type": "string",
+                        "enum": [
+                          "preserved",
+                          "not_preserved",
+                          "unknown",
+                          "not_applicable"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "tabs",
+                      "comments",
+                      "suggestions"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "limitations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 0
+                  },
+                  "authorship": {
+                    "type": "string",
+                    "enum": [
+                      "human",
+                      "ai_generated",
+                      "mixed",
+                      "unknown"
+                    ],
+                    "description": "Optional. Who authored the exported content; ai_generated/mixed raise an ai_generated_source warning."
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                    "description": "Optional. Exact bytes this provenance describes; a mismatch blocks capture (stale metadata)."
+                  },
+                  "content_date": {
+                    "type": "string",
+                    "minLength": 10,
+                    "description": "Optional. When the content was authored/held (ISO date or timestamp with timezone). Overrides filename dates."
+                  },
+                  "revised_at": {
+                    "type": "string",
+                    "minLength": 20,
+                    "description": "Optional. Upstream revision time (Drive modifiedTime, commit time)."
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "url",
+                  "revision",
+                  "captured_at",
+                  "features",
+                  "limitations"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "temporal": {
+            "type": "object",
+            "properties": {
+              "content_date": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "minLength": 10
+                      },
+                      "basis": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "precision": {
+                        "type": "string",
+                        "enum": [
+                          "day",
+                          "minute",
+                          "second"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "basis",
+                      "precision"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "observed_mtime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 20
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "content_date",
+              "observed_mtime"
+            ],
+            "additionalProperties": false,
+            "description": "Content time vs file-system time; neither is capture time (manifest.created_at)."
+          }
+        },
+        "required": [
+          "evidence_id",
+          "logical_id",
+          "source_id",
+          "source_type",
+          "relative_path",
+          "sha256",
+          "bytes",
+          "line_count",
+          "encoding",
+          "snapshot_path",
+          "provenance"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "warning",
+              "error"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "severity",
+          "code",
+          "source_id",
+          "path",
+          "detail"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "delta": {
+      "type": "object",
+      "properties": {
+        "baseline_run_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compatible": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "added": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "modified": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "unchanged": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "baseline_created_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 20
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "baseline_sequence": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "renamed": {
+          "type": "array",
+          "minItems": 0,
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "from",
+              "to"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "baseline_run_id",
+        "compatible",
+        "added",
+        "modified",
+        "removed",
+        "unchanged"
+      ],
+      "additionalProperties": false
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Per-project capture order; authoritative over created_at for ordering."
+    }
+  },
+  "required": [
+    "schema_version",
+    "tool_version",
+    "project_id",
+    "run_id",
+    "created_at",
+    "config_sha256",
+    "scope_sha256",
+    "config_snapshot",
+    "status",
+    "limits",
+    "sources",
+    "files",
+    "issues",
+    "delta"
+  ],
+  "additionalProperties": false
+}

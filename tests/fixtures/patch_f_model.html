@@ -1,0 +1,7 @@
+<!doctype html><html><body>
+<h2>Supplier entity and values</h2><table><tr><th>Entity</th><th>Column</th><th>Type</th><th>Unit</th><th>Status</th></tr><tr><td>Supplier</td><td><p>credit_limit</p></td><td>decimal</td><td>USD</td><td>proposed</td></tr></table>
+<h2>Declared relationship</h2><table><tr><th>From</th><th>To</th><th>Cardinality</th><th>Status</th></tr><tr><td>Supplier.id</td><td>Invoice.supplier_id</td><td>1:N</td><td>pending review</td></tr></table>
+<h2>Integration Alpha query</h2><pre><code>SELECT supplier_id, credit_limit FROM supplier WHERE state = 'active';</code></pre>
+<h2>State transitions</h2><table><tr><th>Current</th><th>Event</th><th>Next</th><th>Status</th></tr><tr><td>draft</td><td>approve</td><td>active</td><td>proposed</td></tr></table>
+<h2>Model change history</h2><table><tr><th>Version</th><th>Effective date</th><th>Change</th><th>Status</th></tr><tr><td>v2</td><td>2026-09-01</td><td>credit_limit added</td><td>pending</td></tr></table>
+</body></html>

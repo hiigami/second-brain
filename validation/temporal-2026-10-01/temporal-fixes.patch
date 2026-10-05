@@ -1,0 +1,813 @@
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/schemas/manifest.schema.json sb3/schemas/manifest.schema.json
+--- sb/schemas/manifest.schema.json	2026-10-01 13:55:31.000000000 -0600
++++ sb3/schemas/manifest.schema.json	2026-10-01 14:23:55.549000268 -0600
+@@ -456,6 +456,21 @@
+                       "unknown"
+                     ],
+                     "description": "Optional. Who authored the exported content; ai_generated/mixed raise an ai_generated_source warning."
++                  },
++                  "sha256": {
++                    "type": "string",
++                    "pattern": "^[a-f0-9]{64}$",
++                    "description": "Optional. Exact bytes this provenance describes; a mismatch blocks capture (stale metadata)."
++                  },
++                  "content_date": {
++                    "type": "string",
++                    "minLength": 10,
++                    "description": "Optional. When the content was authored/held (ISO date or timestamp with timezone). Overrides filename dates."
++                  },
++                  "revised_at": {
++                    "type": "string",
++                    "minLength": 20,
++                    "description": "Optional. Upstream revision time (Drive modifiedTime, commit time)."
+                   }
+                 },
+                 "required": [
+@@ -473,6 +488,62 @@
+                 "type": "null"
+               }
+             ]
++          },
++          "temporal": {
++            "type": "object",
++            "properties": {
++              "content_date": {
++                "anyOf": [
++                  {
++                    "type": "object",
++                    "properties": {
++                      "value": {
++                        "type": "string",
++                        "minLength": 10
++                      },
++                      "basis": {
++                        "type": "string",
++                        "minLength": 1
++                      },
++                      "precision": {
++                        "type": "string",
++                        "enum": [
++                          "day",
++                          "minute",
++                          "second"
++                        ]
++                      }
++                    },
++                    "required": [
++                      "value",
++                      "basis",
++                      "precision"
++                    ],
++                    "additionalProperties": false
++                  },
++                  {
++                    "type": "null"
++                  }
++                ]
++              },
++              "observed_mtime": {
++                "anyOf": [
++                  {
++                    "type": "string",
++                    "minLength": 20
++                  },
++                  {
++                    "type": "null"
++                  }
++                ]
++              }
++            },
++            "required": [
++              "content_date",
++              "observed_mtime"
++            ],
++            "additionalProperties": false,
++            "description": "Content time vs file-system time; neither is capture time (manifest.created_at)."
+           }
+         },
+         "required": [
+@@ -601,6 +672,50 @@
+           },
+           "minItems": 0,
+           "uniqueItems": true
++        },
++        "baseline_created_at": {
++          "anyOf": [
++            {
++              "type": "string",
++              "minLength": 20
++            },
++            {
++              "type": "null"
++            }
++          ]
++        },
++        "baseline_sequence": {
++          "anyOf": [
++            {
++              "type": "integer",
++              "minimum": 1
++            },
++            {
++              "type": "null"
++            }
++          ]
++        },
++        "renamed": {
++          "type": "array",
++          "minItems": 0,
++          "items": {
++            "type": "object",
++            "properties": {
++              "from": {
++                "type": "string",
++                "minLength": 1
++              },
++              "to": {
++                "type": "string",
++                "minLength": 1
++              }
++            },
++            "required": [
++              "from",
++              "to"
++            ],
++            "additionalProperties": false
++          }
+         }
+       },
+       "required": [
+@@ -612,6 +727,11 @@
+         "unchanged"
+       ],
+       "additionalProperties": false
++    },
++    "sequence": {
++      "type": "integer",
++      "minimum": 1,
++      "description": "Per-project capture order; authoritative over created_at for ordering."
+     }
+   },
+   "required": [
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/schemas/review.schema.json sb3/schemas/review.schema.json
+--- sb/schemas/review.schema.json	2026-10-01 13:49:35.000000000 -0600
++++ sb3/schemas/review.schema.json	2026-10-01 14:23:55.549000268 -0600
+@@ -148,6 +148,16 @@
+     },
+     "notes": {
+       "type": "string"
++    },
++    "prepared_at": {
++      "type": "string",
++      "minLength": 20,
++      "description": "Written by --prepare; reviewed_at must not precede it."
++    },
++    "rollback_reason": {
++      "type": "string",
++      "minLength": 1,
++      "description": "Required to publish a capture older than CURRENT."
+     }
+   },
+   "required": [
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/schemas/source-provenance.schema.json sb3/schemas/source-provenance.schema.json
+--- sb/schemas/source-provenance.schema.json	2026-10-01 13:49:35.000000000 -0600
++++ sb3/schemas/source-provenance.schema.json	2026-10-01 14:23:55.548000268 -0600
+@@ -124,6 +124,21 @@
+                   "unknown"
+                 ],
+                 "description": "Optional. Who authored the exported content; ai_generated/mixed raise an ai_generated_source warning."
++              },
++              "sha256": {
++                "type": "string",
++                "pattern": "^[a-f0-9]{64}$",
++                "description": "Optional. Exact bytes this provenance describes; a mismatch blocks capture (stale metadata)."
++              },
++              "content_date": {
++                "type": "string",
++                "minLength": 10,
++                "description": "Optional. When the content was authored/held (ISO date or timestamp with timezone). Overrides filename dates."
++              },
++              "revised_at": {
++                "type": "string",
++                "minLength": 20,
++                "description": "Optional. Upstream revision time (Drive modifiedTime, commit time)."
+               }
+             },
+             "required": [
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/tests/test_contract_v02.py sb3/tests/test_contract_v02.py
+--- sb/tests/test_contract_v02.py	2026-10-01 14:01:49.000000000 -0600
++++ sb3/tests/test_contract_v02.py	2026-10-01 14:23:55.551000268 -0600
+@@ -188,7 +188,8 @@
+         run, m, records, path = self.full_run()
+         rp, review = self.approve(run)
+         legacy = {k: v for k, v in review.items()
+-                  if k not in ("warning_summary", "acknowledged_warnings", "triaged_evidence_ids", "triage_acknowledged")}
++                  if k not in ("warning_summary", "acknowledged_warnings", "triaged_evidence_ids", "triage_acknowledged",
++                               "prepared_at")}
+         legacy.update(schema_version="0.1", acknowledged_issue_codes=sorted(review["warning_summary"]["counts"]))
+         self.save(rp, legacy)
+         contract(legacy, "review")
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/tests/test_temporal.py sb3/tests/test_temporal.py
+--- sb/tests/test_temporal.py	1969-12-31 18:00:00.000000000 -0600
++++ sb3/tests/test_temporal.py	2026-10-01 14:26:23.263000338 -0600
+@@ -0,0 +1,182 @@
++"""Temporal integrity: content vs capture time, ordering of runs, releases and re-anchoring,
++stale provenance, renames and partial evidence loss. Synthetic fixtures only."""
++import json
++import shutil
++import sys
++import tempfile
++import unittest
++from datetime import datetime, timezone
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT / "tools"))
++sys.path.insert(0, str(ROOT / "tests"))
++import kb_inventory
++from kb_common import KBError, content_date_from_name, content_sort_key, read_json, utc_now, write_json_new
++from kb_inventory import inventory
++from kb_publish import prepare_review, publish
++from kb_reanchor import reanchor
++from helpers import PROJECT_CONFIG, PROVENANCE, SOURCES, synthetic_records
++
++
++class TemporalTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory()
++        root = Path(self.temp.name).resolve()
++        self.sources = root / "sources"
++        shutil.copytree(SOURCES, self.sources)
++        self.project = root / "projects" / "demo"
++        (self.project / "config").mkdir(parents=True)
++        self.config = self.project / "config" / "project.json"
++        cfg = read_json(PROJECT_CONFIG)
++        for s in cfg["sources"]:
++            s["path"] = str(self.sources / s["id"])
++        self.config.write_text(json.dumps(cfg), encoding="utf-8")
++        self.prov_path = self.project / "config" / "source-provenance.json"
++        shutil.copyfile(PROVENANCE, self.prov_path)
++        self.req = self.sources / "requirements" / "requirements.md"
++
++    def tearDown(self):
++        self.temp.cleanup()
++
++    def records(self, run, m):
++        rec = synthetic_records(run, m, schema_version="0.2")
++        cited = {e["evidence_id"] for r in rec["records"] for e in r["evidence"]}
++        cited |= {e["evidence_id"] for r in rec["records"] if r["investigation"]
++                  for f in r["investigation"]["findings"] for e in f["evidence"]}
++        for c in rec["coverage"]:
++            if c["evidence_id"] not in cited:
++                c.update(disposition="reviewed_no_record", note="test")
++        write_json_new(run / "proposals" / "records.json", rec)
++
++    def review(self, run, **extra):
++        r = prepare_review(self.config, run)
++        r.update(decision="approve", reviewer="Synthetic test operator (simulated)", reviewed_at=utc_now())
++        r["checks"] = dict.fromkeys(r["checks"], True)
++        r["acknowledged_warnings"] = dict(r["warning_summary"]["counts"])
++        r["triage_acknowledged"] = bool(r["triaged_evidence_ids"])
++        r.update(extra)
++        path = run / "review.json"
++        path.write_text(json.dumps(r), encoding="utf-8")
++        return path
++
++    def edit_provenance(self, fn):
++        p = read_json(self.prov_path); fn(p); self.prov_path.write_text(json.dumps(p), encoding="utf-8")
++
++    # --- content time vs capture time ---------------------------------------------------
++    def test_content_dates_from_names(self):
++        g = content_date_from_name("[Sync] Demo - 2026_09_25 12_00 GMT-05_00 - Notes by Gemini.docx")
++        self.assertEqual(g, {"value": "2026-09-25T12:00:00-05:00", "basis": "filename:gemini_notes", "precision": "minute"})
++        self.assertEqual(content_date_from_name("notes/2026-08-30-kickoff.md")["value"], "2026-08-30")
++        self.assertIsNone(content_date_from_name("meeting.md"))
++        self.assertIsNone(content_date_from_name("2026-13-45-bad.md"))
++        # Ordering normalizes offsets: 12:00 GMT-05 (17:00Z) precedes 14:30 GMT-03 (17:30Z) only in UTC.
++        self.assertLess(content_sort_key("2026-09-25T12:00:00-05:00"), content_sort_key("2026-09-25T14:30:00-03:00"))
++
++    def test_old_note_captured_late_keeps_its_content_date(self):
++        r1, _ = inventory(self.config, "one")
++        (self.sources / "meetings" / "2026-08-30-kickoff.md").write_text("# Kickoff\n\nLimit 5.\n", encoding="utf-8")
++        r2, m2 = inventory(self.config, "two", baseline=r1)
++        f = next(x for x in m2["files"] if "kickoff" in x["relative_path"])
++        self.assertEqual(f["temporal"]["content_date"]["value"], "2026-08-30")
++        self.assertLess(f["temporal"]["content_date"]["value"], m2["created_at"][:10])
++        self.assertEqual(m2["sequence"], 2)
++
++    def test_provenance_content_date_overrides_filename(self):
++        self.edit_provenance(lambda p: p["entries"][0]["origin"].update(content_date="2026-07-01"))
++        _, m = inventory(self.config, "one")
++        f = next(x for x in m["files"] if x["source_id"] == p_source(self.prov_path))
++        self.assertEqual(f["temporal"]["content_date"], {"value": "2026-07-01", "basis": "provenance", "precision": "day"})
++
++    # --- provenance staleness and impossible times --------------------------------------
++    def test_provenance_bound_to_other_bytes_blocks(self):
++        self.edit_provenance(lambda p: p["entries"][0]["origin"].update(sha256="0" * 64))
++        _, m = inventory(self.config, "one")
++        self.assertEqual(m["status"], "blocked")
++        self.assertIn("provenance_stale", {i["code"] for i in m["issues"]})
++
++    def test_changed_bytes_with_unchanged_provenance_warns(self):
++        r1, _ = inventory(self.config, "one")
++        self.req.write_text(self.req.read_text() + "\nLater edit.\n", encoding="utf-8")
++        _, m = inventory(self.config, "two", baseline=r1)
++        self.assertIn("provenance_not_updated", {i["code"] for i in m["issues"]})
++
++    def test_future_capture_time_blocks(self):
++        self.edit_provenance(lambda p: p["entries"][0]["origin"].update(captured_at="2099-01-01T00:00:00+00:00"))
++        _, m = inventory(self.config, "one")
++        self.assertIn("provenance_timestamp_in_future", {i["code"] for i in m["issues"] if i["severity"] == "error"})
++
++    # --- run ordering --------------------------------------------------------------------
++    def test_baseline_skipping_newer_run_warns(self):
++        r1, _ = inventory(self.config, "one")
++        inventory(self.config, "two", baseline=r1)
++        _, m3 = inventory(self.config, "three", baseline=r1)
++        self.assertIn("baseline_not_latest", {i["code"] for i in m3["issues"]})
++        self.assertEqual(m3["delta"]["baseline_sequence"], 1)
++
++    def test_clock_regression_blocks_capture(self):
++        inventory(self.config, "one")
++        class Past(datetime):
++            @classmethod
++            def now(cls, tz=None):
++                return datetime(2020, 1, 1, tzinfo=timezone.utc)
++        with mock.patch.object(kb_inventory, "datetime", Past):
++            with self.assertRaises(KBError):
++                inventory(self.config, "two")
++
++    # --- publication ordering ------------------------------------------------------------
++    def test_older_capture_cannot_silently_replace_current(self):
++        old, mo = inventory(self.config, "old"); self.records(old, mo)
++        self.req.write_text(self.req.read_text().replace("10", "12", 1), encoding="utf-8")
++        new, mn = inventory(self.config, "new", baseline=old); self.records(new, mn)
++        publish(self.config, new, self.review(new), True)
++        with self.assertRaises(KBError):
++            publish(self.config, old, self.review(old), True)
++        publish(self.config, old, self.review(old, rollback_reason="Revert a bad export; owner request (test)"), True)
++        history = (self.project / "knowledge/approved/HISTORY.jsonl").read_text().splitlines()
++        self.assertEqual([json.loads(l)["run_id"] for l in history], ["new", "old"])
++        self.assertIsNotNone(json.loads(history[1])["rollback_reason"])
++
++    def test_review_time_must_follow_preparation(self):
++        run, m = inventory(self.config, "one"); self.records(run, m)
++        with self.assertRaises(KBError):
++            publish(self.config, run, self.review(run, reviewed_at="2001-01-01T00:00:00+00:00"), True)
++        with self.assertRaises(KBError):
++            publish(self.config, run, self.review(run, reviewed_at="2099-01-01T00:00:00+00:00"), True)
++
++    # --- re-anchoring --------------------------------------------------------------------
++    def test_reanchor_only_moves_forward(self):
++        old, _ = inventory(self.config, "old")
++        self.req.write_text(self.req.read_text() + "\nExtra.\n", encoding="utf-8")
++        new, mn = inventory(self.config, "new", baseline=old); self.records(new, mn)
++        with self.assertRaises(KBError):
++            reanchor(new, old)
++
++    def test_byte_identical_rename_is_followed(self):
++        a, ma = inventory(self.config, "a"); self.records(a, ma)
++        self.req.rename(self.req.with_name("requirements-v2.md"))
++        self.edit_provenance(lambda p: [e.update(relative_path="requirements-v2.md") for e in p["entries"]
++                                        if e["relative_path"] == "requirements.md"])
++        b, mb = inventory(self.config, "b", baseline=a)
++        self.assertEqual(len(mb["delta"]["renamed"]), 1)
++        records, report = reanchor(a, b)
++        self.assertEqual(report["dropped_record_ids"], [])
++        self.assertEqual(report["structural_check"]["status"], "passed")
++
++    def test_partial_evidence_loss_is_flagged(self):
++        a, ma = inventory(self.config, "a"); self.records(a, ma)
++        self.req.write_text("# Requirements\n\nRewritten; the limit line is gone.\n", encoding="utf-8")
++        b, _ = inventory(self.config, "b", baseline=a)
++        records, report = reanchor(a, b)
++        self.assertIn("UNC-001", report["degraded_record_ids"])
++        unc = next(r for r in records["records"] if r["id"] == "UNC-001")
++        self.assertTrue(any("lost" in q for q in unc["open_questions"]))
++
++
++def p_source(prov_path):
++    return read_json(prov_path)["entries"][0]["source_id"]
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/tools/kb_check.py sb3/tools/kb_check.py
+--- sb/tools/kb_check.py	2026-10-01 13:52:32.000000000 -0600
++++ sb3/tools/kb_check.py	2026-10-01 14:23:55.550000268 -0600
+@@ -122,6 +122,9 @@
+             raise KBError(f"Snapshot line count/content mismatch: {eid}")
+         if f["provenance"] is not None:
+             check_timestamp(f["provenance"]["captured_at"])
++        content_date = (f.get("temporal") or {}).get("content_date")
++        if content_date and len(content_date["value"]) > 10:
++            check_timestamp(content_date["value"])
+         counts[f["source_id"]] += 1
+         total += len(raw)
+     if total > m["limits"]["max_total_bytes"] or len(m["files"]) > m["limits"]["max_files"]:
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/tools/kb_common.py sb3/tools/kb_common.py
+--- sb/tools/kb_common.py	2026-10-01 13:52:32.000000000 -0600
++++ sb3/tools/kb_common.py	2026-10-01 14:23:55.548000268 -0600
+@@ -54,6 +54,52 @@
+     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+ 
+ 
++def parse_ts(value: str) -> datetime:
++    """Parse an ISO 8601 timestamp that carries a timezone; compare these, never strings."""
++    check_timestamp(value)
++    return datetime.fromisoformat(value.replace("Z", "+00:00"))
++
++
++# Clock skew tolerated between an operator-supplied timestamp and this machine.
++CLOCK_SKEW_SECONDS = 600
++
++# Deterministic content-date sources, most specific first. A filename date is the
++# date the *content* claims (e.g. a meeting), never the capture or file-system time.
++_CONTENT_DATE_PATTERNS = (
++    ("filename:gemini_notes", "minute",
++     re.compile(r"(?<!\d)(\d{4})_(\d{2})_(\d{2}) (\d{2})_(\d{2}) GMT([+-]\d{2})_(\d{2})(?!\d)")),
++    ("filename:iso_date", "day", re.compile(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)")),
++    ("filename:underscore_date", "day", re.compile(r"(?<!\d)(\d{4})_(\d{2})_(\d{2})(?!\d)")),
++)
++
++
++def content_date_from_name(relative_path: str) -> dict | None:
++    """Best-effort, deterministic content date from a file name; None when absent or invalid."""
++    import unicodedata
++    name = unicodedata.normalize("NFC", relative_path.rsplit("/", 1)[-1])
++    for basis, precision, pattern in _CONTENT_DATE_PATTERNS:
++        m = pattern.search(name)
++        if not m:
++            continue
++        g = m.groups()
++        try:
++            if precision == "minute":
++                value = datetime.fromisoformat(f"{g[0]}-{g[1]}-{g[2]}T{g[3]}:{g[4]}:00{g[5]}:{g[6]}").isoformat()
++            else:
++                value = datetime(int(g[0]), int(g[1]), int(g[2])).date().isoformat()
++        except ValueError:
++            continue
++        return {"value": value, "basis": basis, "precision": precision}
++    return None
++
++
++def content_sort_key(value: str) -> str:
++    """UTC-normalized ordering key for a content_date value (date-only sorts at 00:00 UTC)."""
++    if len(value) == 10:
++        return value + "T00:00:00+00:00"
++    return parse_ts(value).astimezone(timezone.utc).isoformat()
++
++
+ def sha(data: bytes) -> str:
+     return hashlib.sha256(data).hexdigest()
+ 
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/tools/kb_inventory.py sb3/tools/kb_inventory.py
+--- sb/tools/kb_inventory.py	2026-10-01 13:52:32.000000000 -0600
++++ sb3/tools/kb_inventory.py	2026-10-01 14:23:55.550000268 -0600
+@@ -16,7 +16,9 @@
+                        check_timestamp, contract, evidence_identity, excluded,
+                        extraction_snapshot_paths, identifier, json_sha,
+                        load_project, matches, no_symlinks, read_json, read_stable,
+-                       relative, run_cli, sha, utc_now, write_json_new, write_new)
++                       relative, run_cli, sha, utc_now, write_json_new, write_new,
++                       CLOCK_SKEW_SECONDS, content_date_from_name, parse_ts)
++from datetime import datetime, timedelta, timezone
+ 
+ 
+ class CaptureBudgetReached(KBError):
+@@ -36,6 +38,56 @@
+     return json_sha(documents)
+ 
+ 
++def temporal_entry(origin: dict | None, rel: str, path: Path) -> dict:
++    """Separate content time from file-system time; capture time lives on the manifest."""
++    if origin is not None and origin.get("content_date"):
++        value = origin["content_date"]
++        content = {"value": value, "basis": "provenance",
++                   "precision": "day" if len(value) == 10 else "second"}
++    else:
++        content = content_date_from_name(rel)
++    try:
++        mtime = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat(timespec="seconds")
++    except OSError:
++        mtime = None
++    return {"content_date": content, "observed_mtime": mtime}
++
++
++def provenance_time_issues(origin: dict | None, content_sha: str, now: datetime) -> list[tuple[str, str, str]]:
++    """(severity, code, detail) for provenance that is stale or claims an impossible time."""
++    out = []
++    if origin is None:
++        return out
++    if origin.get("sha256") and origin["sha256"] != content_sha:
++        out.append(("error", "provenance_stale", "Provenance describes different bytes (sha256 mismatch); "
++                    "update source-provenance.json for the new export"))
++    limit = now + timedelta(seconds=CLOCK_SKEW_SECONDS)
++    for key in ("captured_at", "revised_at"):
++        if origin.get(key) and parse_ts(origin[key]) > limit:
++            out.append(("error", "provenance_timestamp_in_future", f"{key} is later than this capture"))
++    if origin.get("revised_at") and parse_ts(origin["revised_at"]) > parse_ts(origin["captured_at"]):
++        out.append(("error", "provenance_revised_after_capture", "revised_at is later than captured_at"))
++    if origin.get("content_date") and len(origin["content_date"]) > 10:
++        check_timestamp(origin["content_date"])
++    return out
++
++
++def prior_runs(runs_dir: Path, current: str) -> list[dict]:
++    """Sealed manifests of this project's other runs (blocked runs included: they consumed a sequence)."""
++    from kb_check import load_manifest
++    out = []
++    if not runs_dir.is_dir():
++        return out
++    for child in sorted(runs_dir.iterdir()):
++        if child.name.startswith(".") or child.name == current or not (child / "manifest.json").is_file():
++            continue
++        try:
++            out.append(load_manifest(child))
++        except KBError:
++            continue  # tampered/legacy runs are reported by kb_check, not used for ordering
++    return out
++
++
+ def provenance_warnings(origin: dict | None, source_type: str, rel: str) -> list[tuple[str, str]]:
+     """Warnings about how far a captured file's origin and authorship are established."""
+     out = []
+@@ -174,6 +226,7 @@
+              "sha256": content_sha, "bytes": len(data),
+              "line_count": metadata["text_line_count"], "encoding": "utf-8",
+              "snapshot_path": paths["text"], "provenance": origin,
++             "temporal": temporal_entry(origin, rel, source_path),
+              "document": {
+                  "status": metadata["status"], "media_type": metadata["media_type"],
+                  "original_sha256": content_sha, "original_bytes": len(data),
+@@ -215,6 +268,16 @@
+             raise KBError("Baseline belongs to another project")
+         if previous["status"] != "ready":
+             raise KBError("A blocked inventory cannot be a baseline")
++    started = datetime.now(timezone.utc)
++    others = prior_runs(locations["runs"], run_id)
++    latest = max((parse_ts(o["created_at"]) for o in others), default=None)
++    if latest is not None and started + timedelta(seconds=CLOCK_SKEW_SECONDS) < latest:
++        raise KBError(f"Clock regression: this machine's time {started.isoformat()} is earlier than an existing "
++                      f"run ({latest.isoformat()}); fix the clock before capturing")
++    sequence = 1 + max((o.get("sequence", 0) for o in others), default=0)
++    if previous:
++        if parse_ts(previous["created_at"]) > started + timedelta(seconds=CLOCK_SKEW_SECONDS):
++            raise KBError("Baseline was captured after this run; a delta must compare against an older capture")
+     provenance_path = project / "config" / "source-provenance.json"
+     provenance = {}
+     if provenance_path.exists():
+@@ -251,12 +314,14 @@
+         extraction_options = {"csv_encoding": csv_encoding, "csv_delimiter": csv_delimiter,
+                               "allow_legacy_ppt": allow_legacy_ppt, "soffice": soffice}
+     manifest = {"schema_version": "0.1", "tool_version": TOOL_VERSION,
+-                "project_id": cfg["project"]["id"], "run_id": run_id, "created_at": utc_now(),
++                "project_id": cfg["project"]["id"], "run_id": run_id, "sequence": sequence,
++                "created_at": started.isoformat(timespec="seconds"),
+                 "config_sha256": json_sha(cfg), "scope_sha256": json_sha(scope),
+                 "config_snapshot": "project.snapshot.json", "status": "ready",
+                 "limits": limits, "sources": [], "files": [], "issues": [],
+-                "delta": {"baseline_run_id": None, "compatible": None,
+-                          "added": [], "modified": [], "removed": [], "unchanged": []}}
++                "delta": {"baseline_run_id": None, "baseline_created_at": None, "baseline_sequence": None,
++                          "compatible": None, "added": [], "modified": [], "removed": [], "unchanged": [],
++                          "renamed": []}}
+     if documents_policy is not None:
+         # Recorded in the manifest so kb_check can rebuild the scope digest from
+         # the frozen manifest alone; text-only runs omit the key entirely.
+@@ -336,6 +401,9 @@
+                                 document_timeout_seconds, options_sha256)
+                             for item in entry.pop("_warnings"):
+                                 issue("warning", item["code"], sid, rel, item["detail"])
++                            for severity, code, detail in provenance_time_issues(
++                                    entry["entry"]["provenance"], entry["entry"]["sha256"], started):
++                                issue(severity, code, sid, rel, detail)
+                             manifest["files"].append(entry["entry"])
+                             total += len(data)
+                             summary["eligible_count"] += 1
+@@ -363,12 +431,15 @@
+                             used_keys.add((sid, rel))
+                         for code, detail in provenance_warnings(origin, source["type"], rel):
+                             issue("warning", code, sid, rel, detail)
++                        for severity, code, detail in provenance_time_issues(origin, content_sha, started):
++                            issue(severity, code, sid, rel, detail)
+                         snapshot = f"snapshots/{eid}.txt"
+                         write_new(tmp / snapshot, data)
+                         manifest["files"].append({"evidence_id": eid, "logical_id": logical,
+                             "source_id": sid, "source_type": source["type"], "relative_path": rel,
+                             "sha256": content_sha, "bytes": len(data), "line_count": len(text.splitlines()),
+-                            "encoding": "utf-8", "snapshot_path": snapshot, "provenance": origin})
++                            "encoding": "utf-8", "snapshot_path": snapshot, "provenance": origin,
++                            "temporal": temporal_entry(origin, rel, p)})
+                         total += len(data)
+                         summary["eligible_count"] += 1
+                     except (KBError, OSError) as exc:
+@@ -394,15 +465,36 @@
+         now = {f["logical_id"]: f for f in manifest["files"]}
+         if previous:
+             delta["baseline_run_id"] = previous["run_id"]
++            delta["baseline_created_at"] = previous["created_at"]
++            delta["baseline_sequence"] = previous.get("sequence")
++            newer = sorted(o["run_id"] for o in others if o["status"] == "ready"
++                           and (o.get("sequence", 0), o["created_at"]) > (previous.get("sequence", 0), previous["created_at"]))
++            if newer:
++                issue("warning", "baseline_not_latest", None, None,
++                      f"Newer ready runs exist after the baseline ({', '.join(newer)}); this delta skips them")
+             incomplete = any(i["severity"] == "error" for i in manifest["issues"])
+             delta["compatible"] = not incomplete and previous["scope_sha256"] == manifest["scope_sha256"]
+             if delta["compatible"]:
+                 old = {f["logical_id"]: f for f in previous["files"]}
+                 delta["added"] = sorted(set(now) - set(old))
+                 delta["removed"] = sorted(set(old) - set(now))
++                def text_sha(f):  # what citations actually quote
++                    return f["document"]["text_sha256"] if "document" in f else f["sha256"]
+                 for k in sorted(set(old) & set(now)):
+-                    changed = (now[k]["sha256"], canonical(now[k]["provenance"])) != (old[k]["sha256"], canonical(old[k]["provenance"]))
++                    changed = (now[k]["sha256"], text_sha(now[k]), canonical(now[k]["provenance"])) != \
++                              (old[k]["sha256"], text_sha(old[k]), canonical(old[k]["provenance"]))
+                     delta["modified" if changed else "unchanged"].append(k)
++                    if now[k]["sha256"] != old[k]["sha256"] and now[k]["provenance"] is not None \
++                            and canonical(now[k]["provenance"]) == canonical(old[k]["provenance"]):
++                        issue("warning", "provenance_not_updated", now[k]["source_id"], now[k]["relative_path"],
++                              "Bytes changed but provenance (captured_at/revision) did not; it may describe the old export")
++                by_hash = {}
++                for k in delta["removed"]:
++                    by_hash.setdefault((old[k]["source_id"], old[k]["sha256"]), []).append(k)
++                for k in delta["added"]:
++                    cands = by_hash.get((now[k]["source_id"], now[k]["sha256"]), [])
++                    if len(cands) == 1:
++                        delta["renamed"].append({"from": cands.pop(), "to": k})
+             else:
+                 issue("warning", "inventory_incomplete_delta_unavailable" if incomplete else "scope_changed", None, None,
+                       "Delta is incomparable; incomplete capture or changed scope must not be interpreted as deletions")
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/tools/kb_publish.py sb3/tools/kb_publish.py
+--- sb/tools/kb_publish.py	2026-10-01 14:08:42.000000000 -0600
++++ sb3/tools/kb_publish.py	2026-10-01 14:23:55.550000268 -0600
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env python3
+ """Prepare a review, or explicitly publish a human-reviewed immutable knowledge release."""
+ import argparse
++import json
+ import html
+ import os
+ import re
+@@ -10,7 +11,9 @@
+ 
+ from kb_common import (KBError, atomic_json, check_timestamp, contract, identifier, inside,
+                        json_sha, load_project, no_symlinks, read_json, read_stable,
+-                       run_cli, sha, utc_now, warning_summary, write_json_new, write_new)
++                       run_cli, sha, utc_now, warning_summary, write_json_new, write_new,
++                       CLOCK_SKEW_SECONDS, parse_ts)
++from datetime import datetime, timedelta, timezone
+ from kb_check import check_run, load_manifest
+ 
+ REVIEW_CHECKS = ("evidence_support", "conflicts_explicit", "source_authority_checked",
+@@ -55,7 +58,7 @@
+     records = read_json(records_path)
+     ids = {r["id"] for r in records["records"]}
+     return {"schema_version": "0.2", "project_id": m["project_id"], "run_id": m["run_id"],
+-            "decision": "changes_requested", "reviewer": "", "reviewed_at": None,
++            "decision": "changes_requested", "reviewer": "", "reviewed_at": None, "prepared_at": utc_now(),
+             "manifest_sha256": sha(read_stable(run / "manifest.json", 16 * 1024 * 1024)),
+             "records_sha256": sha(read_stable(records_path, 16 * 1024 * 1024)),
+             "previous_release_id": previous_id, "approved_record_ids": sorted(ids),
+@@ -277,7 +280,12 @@
+         raise KBError("Review uses the 0.1 per-code acknowledgement contract; prepare a new review with this engine")
+     if review["decision"] != "approve" or not review["reviewer"].strip() or review["reviewed_at"] is None:
+         raise KBError("Review must name a human reviewer, timestamp, and explicit approve decision")
+-    check_timestamp(review["reviewed_at"])
++    reviewed = parse_ts(review["reviewed_at"])
++    floor = parse_ts(review.get("prepared_at") or m["created_at"])
++    if reviewed < floor or reviewed < parse_ts(m["created_at"]):
++        raise KBError("reviewed_at precedes the capture or the review preparation; record the real review time")
++    if reviewed > datetime.now(timezone.utc) + timedelta(seconds=CLOCK_SKEW_SECONDS):
++        raise KBError("reviewed_at is in the future")
+     if review["project_id"] != m["project_id"] or review["run_id"] != m["run_id"]:
+         raise KBError("Review belongs to a different project/run")
+     manifest_raw = read_stable(run / "manifest.json", 16 * 1024 * 1024)
+@@ -314,6 +322,12 @@
+             raise KBError("Removed record acknowledgement does not match the current release")
+         if destination.exists():
+             raise KBError("Release already exists; immutable releases are never overwritten")
++        if current_id is not None:
++            cur_m = read_json(inside(approved, current_id) / "manifest.json")
++            older = (m.get("sequence", 0), parse_ts(m["created_at"])) < (cur_m.get("sequence", 0), parse_ts(cur_m["created_at"]))
++            if older and not review.get("rollback_reason"):
++                raise KBError(f"This run was captured before CURRENT ({current_id}); publishing it would roll "
++                              "knowledge back in time. Set review.rollback_reason to do so deliberately")
+         tmp.mkdir()
+         # Byte-preserving copies: verification runs again against the completed release.
+         write_new(tmp / "manifest.json", manifest_raw)
+@@ -344,6 +358,13 @@
+         if sha(read_stable(records_path, 16 * 1024 * 1024)) != sha(records_raw) or sha(read_stable(review_path, 16 * 1024 * 1024)) != sha(review_raw):
+             raise KBError("Records/review changed during publication; retry after stabilizing files")
+         tmp.rename(destination)
++        history = approved / "HISTORY.jsonl"
++        entry = {"published_at": utc_now(), "run_id": m["run_id"], "sequence": m.get("sequence"),
++                 "captured_at": m["created_at"], "previous_release_id": current_id,
++                 "reviewer": review["reviewer"], "reviewed_at": review["reviewed_at"],
++                 "rollback_reason": review.get("rollback_reason")}
++        with history.open("a", encoding="utf-8") as handle:  # append-only publication log
++            handle.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
+         atomic_json(approved / "CURRENT.json", {"schema_version": "0.1", "project_id": m["project_id"],
+                     "run_id": m["run_id"], "records_sha256": sha(records_raw),
+                     "manifest_sha256": sha(manifest_raw), "review_sha256": sha(review_raw), "published_at": utc_now()})
+diff -ruN -x __pycache__ -x projects -x '*.out' sb/tools/kb_reanchor.py sb3/tools/kb_reanchor.py
+--- sb/tools/kb_reanchor.py	2026-10-01 13:57:32.000000000 -0600
++++ sb3/tools/kb_reanchor.py	2026-10-01 14:23:55.551000268 -0600
+@@ -10,7 +10,7 @@
+ import copy
+ from pathlib import Path
+ 
+-from kb_common import KBError, contract, inside, no_symlinks, read_json, read_stable, run_cli, utc_now, write_json_new
++from kb_common import KBError, contract, inside, no_symlinks, parse_ts, read_json, read_stable, run_cli, utc_now, write_json_new
+ from kb_check import check_records, load_manifest
+ 
+ 
+@@ -55,9 +55,18 @@
+         raise KBError("Cannot re-anchor into a blocked inventory")
+     if new_m["project_id"] != old_m["project_id"]:
+         raise KBError("Previous records belong to another project")
++    if (new_m.get("sequence", 0), parse_ts(new_m["created_at"])) <= (old_m.get("sequence", 0), parse_ts(old_m["created_at"])):
++        raise KBError("The target run was not captured after the previous records' run; re-anchoring only moves forward in time")
+     old_files = {f["evidence_id"]: f for f in old_m["files"]}
+     verify_quotes(previous, old_m, old)
+     new_by_logical = {f["logical_id"]: f for f in new_m["files"]}
++    # Follow byte-identical renames recorded by inventory (same source, same sha256).
++    renamed_to = {}
++    if new_m["delta"].get("baseline_run_id") == old_m["run_id"]:
++        renamed_to = {r["from"]: r["to"] for r in new_m["delta"].get("renamed", [])}
++
++    def text_sha(f: dict) -> str:
++        return f["document"]["text_sha256"] if "document" in f else f["sha256"]
+     cache: dict[str, list[str]] = {}
+     def lines(f: dict) -> list[str]:
+         if f["evidence_id"] not in cache:
+@@ -73,12 +82,15 @@
+                "old_lines": [ev["start_line"], ev["end_line"]], "new_evidence_id": None, "new_lines": None}
+         report_rows.append(row)
+         target = new_by_logical.get(src["logical_id"])
++        if target is None and src["logical_id"] in renamed_to:
++            target = new_by_logical.get(renamed_to[src["logical_id"]])
++            row["renamed_to"] = f"{target['source_id']}/{target['relative_path']}"
+         if target is None:
+             row["status"] = "file_absent"
+             return None
+         quote = ev["quote"].split("\n")
+         span = ev["end_line"] - ev["start_line"]
+-        if target["sha256"] == src["sha256"]:
++        if target["sha256"] == src["sha256"] and text_sha(target) == text_sha(src):
+             status, start = "unchanged", ev["start_line"]
+         else:
+             hits = _find(lines(target), quote)
+@@ -96,9 +108,10 @@
+         return {"evidence_id": target["evidence_id"], "start_line": start, "end_line": start + span,
+                 "quote": ev["quote"]}
+ 
+-    kept, dropped = [], []
++    kept, dropped, degraded = [], [], []
+     for r in old["records"]:
+         r = copy.deepcopy(r)
++        before = len(r["evidence"]) + (sum(len(f["evidence"]) for f in r["investigation"]["findings"]) if r["investigation"] else 0)
+         r["evidence"] = [e for e in (move(ev, r["id"], "evidence") for ev in r["evidence"]) if e]
+         inv = r["investigation"]
+         if inv is not None:
+@@ -113,9 +126,15 @@
+             scope |= {ev["evidence_id"] for ev in r["evidence"]}
+             scope |= {ev["evidence_id"] for f in findings for ev in f["evidence"]}
+             inv["scope"] = sorted(scope)
++        after = len(r["evidence"]) + (sum(len(f["evidence"]) for f in inv["findings"]) if inv else 0)
+         if not r["evidence"] or (inv is not None and not inv["findings"]):
+             dropped.append(r["id"])
+         else:
++            if after < before:
++                degraded.append(r["id"])
++                r["open_questions"].append(
++                    f"Re-anchoring from {old['run_id']} lost {before - after} of {before} citations; "
++                    "re-verify that the statement is still supported before approving.")
+             kept.append(r)
+     ids = {r["id"] for r in kept}
+     dropped_relations = []
+@@ -123,6 +142,11 @@
+         for edge in r["relations"]:
+             if edge["target"] not in ids:
+                 dropped_relations.append({"record_id": r["id"], **edge})
++                if r["id"] not in degraded:
++                    degraded.append(r["id"])
++                r["open_questions"].append(
++                    f"Relation {edge['type']} -> {edge['target']} was dropped because the target lost its evidence; "
++                    "re-verify this record's statement.")
+         r["relations"] = [e for e in r["relations"] if e["target"] in ids]
+ 
+     cited = {ev["evidence_id"] for r in kept for ev in r["evidence"]}
+@@ -150,7 +174,8 @@
+         counts[row["status"]] = counts.get(row["status"], 0) + 1
+     report = {"schema_version": "0.1", "created_at": utc_now(), "previous_run_id": old["run_id"],
+               "run_id": new_m["run_id"], "citation_status_counts": dict(sorted(counts.items())),
+-              "dropped_record_ids": dropped, "dropped_relations": dropped_relations,
++              "dropped_record_ids": dropped, "degraded_record_ids": sorted(degraded),
++              "dropped_relations": dropped_relations,
+               "deferred_inputs": sum(1 for c in coverage if c["disposition"] == "deferred"),
+               "citations": report_rows,
+               "limitations": ["An unchanged quote can still mean something different if its surrounding text changed; "

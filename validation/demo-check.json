@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "checked_at": "2026-09-30T20:33:04+00:00",
+  "tool_version": "0.1.0",
+  "project_id": "demo",
+  "run_id": "build-demo-final",
+  "file_count": 5,
+  "stage2_gate": true,
+  "live_existing_files_checked": false,
+  "record_count": 5,
+  "citation_count": 10,
+  "relation_count": 3,
+  "coverage_count": 5,
+  "kind_counts": {
+    "requirement": 2,
+    "decision": 1,
+    "uncertainty": 1,
+    "investigation": 1
+  },
+  "limitations": [
+    "Checks establish integrity and structural consistency, not semantic truth or upstream authority.",
+    "Coverage dispositions are declarations requiring human review.",
+    "Live checking does not discover newly added files; use a new inventory for that."
+  ]
+}

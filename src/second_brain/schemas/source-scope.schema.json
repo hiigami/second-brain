@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "source-scope",
+  "description": "Additive source registration for categories outside frozen project.json v0.1. Each source has one primary category; mixed content is handled by later segment review.",
+  "type": "object",
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "project_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+    "sources": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+          "type": {"type": "string", "enum": ["data", "analysis", "policy"]},
+          "path": {"type": "string", "minLength": 1},
+          "include": {
+            "type": "array", "minItems": 1, "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "exclude": {
+            "type": "array", "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          }
+        },
+        "required": ["id", "type", "path", "include", "exclude"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["schema_version", "project_id", "sources"],
+  "additionalProperties": false
+}

@@ -1,0 +1,90 @@
+{
+  "schema_version": "0.1",
+  "entries": [
+    {
+      "source_id": "requirements",
+      "relative_path": "requirements.md",
+      "origin": {
+        "kind": "local_file",
+        "id": "synthetic-fixture:requirements/requirements.md",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    },
+    {
+      "source_id": "architecture",
+      "relative_path": "decision.md",
+      "origin": {
+        "kind": "local_file",
+        "id": "synthetic-fixture:architecture/decision.md",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    },
+    {
+      "source_id": "meetings",
+      "relative_path": "meeting.md",
+      "origin": {
+        "kind": "local_file",
+        "id": "synthetic-fixture:meetings/meeting.md",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    },
+    {
+      "source_id": "sql",
+      "relative_path": "schema.sql",
+      "origin": {
+        "kind": "local_file",
+        "id": "synthetic-fixture:sql/schema.sql",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    },
+    {
+      "source_id": "repository",
+      "relative_path": "src/search.py",
+      "origin": {
+        "kind": "repository",
+        "id": "synthetic-fixture:repository/src/search.py",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    }
+  ]
+}

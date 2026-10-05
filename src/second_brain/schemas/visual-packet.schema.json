@@ -1,0 +1,337 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "created_at": {
+      "type": "string",
+      "maxLength": 16000
+    },
+    "renderers": {
+      "type": "object",
+      "properties": {
+        "python": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "CairoSVG": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "Pillow": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "pypdf": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "defusedxml": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "tinycss2": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "pdftoppm": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "maxLength": 16000
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "version": {
+                  "type": "string",
+                  "maxLength": 16000
+                }
+              },
+              "required": [
+                "path",
+                "sha256",
+                "version"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "python",
+        "CairoSVG",
+        "Pillow",
+        "pypdf",
+        "defusedxml",
+        "tinycss2",
+        "pdftoppm"
+      ],
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "source_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "image_pixels": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "max_dimension": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "max_items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "max_pdf_pages": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        },
+        "worker_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        }
+      },
+      "required": [
+        "source_bytes",
+        "image_pixels",
+        "max_dimension",
+        "max_items",
+        "max_pdf_pages",
+        "worker_seconds"
+      ],
+      "additionalProperties": false
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^S-[0-9]{4}$"
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "source_path_at_capture": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "extension": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "original_path": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 67108864
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "source_path_at_capture",
+          "extension",
+          "original_path",
+          "sha256",
+          "bytes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^V-[0-9]{4}$"
+          },
+          "source_id": {
+            "type": "string",
+            "pattern": "^S-[0-9]{4}$"
+          },
+          "locator": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "asset_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "status": {
+            "enum": [
+              "rendered",
+              "unavailable"
+            ]
+          },
+          "preview_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 67108864
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 67108864
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "source_id",
+          "locator",
+          "asset_sha256",
+          "status",
+          "preview_path",
+          "preview_sha256",
+          "width",
+          "height"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^GAP-[0-9]{4}$"
+          },
+          "source_id": {
+            "type": "string",
+            "pattern": "^S-[0-9]{4}$"
+          },
+          "locator": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 16000
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 16000
+          }
+        },
+        "required": [
+          "id",
+          "source_id",
+          "locator",
+          "code",
+          "detail"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 16000
+      }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 67108864
+          }
+        },
+        "required": [
+          "sha256",
+          "bytes"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "created_at",
+    "renderers",
+    "limits",
+    "sources",
+    "items",
+    "issues",
+    "limitations",
+    "files"
+  ],
+  "additionalProperties": false
+}

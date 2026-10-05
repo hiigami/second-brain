@@ -1,0 +1,4 @@
+Code;Amount;Unit;Formula text
+00123;"12
+.50";USD;
+00124;0;EUR;=1+1

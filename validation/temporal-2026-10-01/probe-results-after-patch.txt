@@ -1,0 +1,40 @@
+# Sample project filenames in this historical output are anonymized; reported outcomes are retained.
+
+
+=== p1_out_of_order_and_baseline
+P1 month-old note captured today is delta: added
+P1 per-file time fields: {'content_date': {'value': '2026-08-30', 'basis': 'filename:iso_date', 'precision': 'day'}, 'observed_mtime': '2026-10-01T21:19:12+00:00'}
+P1 manifest time fields: {'sequence': 2, 'created_at': '2026-10-01T21:19:12+00:00'}
+P2 run-3 baseline: run-1 (newer run-2 exists); kickoff reported as: added | baseline warnings: ['baseline_not_latest']
+P2 machine clock in 2020: BLOCKED BY ENGINE: Clock regression: this machine's time 2020-01-01T00:00:00+00:00 is earlier than an existing run (2026-10-01T21:19:12+00:00); fix the clock before capturing
+
+=== p3_stale_provenance
+P3 new bytes carry old captured_at/revision: 2026-09-30T00:00:00+00:00 / synthetic-v1 (fixture label, not a Git commit)
+P3 warnings on that file: ['provenance_not_updated']
+P3 captured_at=2099 -> run status: blocked ['provenance_timestamp_in_future']
+
+=== p4_publication_order
+P4 publishing the older capture after the newer one: BLOCKED BY ENGINE: This run was captured before CURRENT (new-capture); publishing it would roll knowledge back in time. Set review.rollback_reason to do so deliberately
+P4 CURRENT: new-capture | HISTORY.jsonl exists: True
+
+=== p5_review_time
+P5 reviewed_at=2001: BLOCKED BY ENGINE: reviewed_at precedes the capture or the review preparation; record the real review time
+
+=== p6_rename_and_partial_loss
+P6 delta added/removed/renamed: 1 1 1
+P6 reanchor: {'unchanged': 10} | dropped: [] | degraded: []
+
+=== p10_partial_evidence_loss
+P10 reanchor: {'unchanged': 7, 'vanished': 3} | dropped: ['REQ-001', 'REQ-002'] | degraded: ['INV-001', 'UNC-001']
+P10 UNC-001 kept with 1 of 2 citations; relations: [] | open questions added: 2 | structural check: passed
+
+=== p7_revert
+P7 A->B->A: v3 evidence id equals v1: True | v3 delta modified: 1
+
+=== p8_reanchor_direction
+P8 newer->older re-anchor: BLOCKED BY ENGINE: The target run was not captured after the previous records' run; re-anchoring only moves forward in time
+
+=== p13_content_dates
+P13 Demo 2.0 Revision - 2026_09_30 14_00 GMT-03 -> {'value': '2026-09-30T14:00:00-03:00', 'basis': 'filename:gemini_notes', 'precision': 'minute'}
+P13 [Sync] Demo - 2026_09_25 12_00 GMT-05_ -> {'value': '2026-09-25T12:00:00-05:00', 'basis': 'filename:gemini_notes', 'precision': 'minute'}
+P13 meeting.md -> None

@@ -1,0 +1,27 @@
+From: Analyst <analyst@example.invalid>
+To: Reviewer <reviewer@example.invalid>
+Date: Tue, 01 Sep 2026 10:00:00 -0600
+Subject: Supplier model review
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="outer"
+
+--outer
+Content-Type: multipart/alternative; boundary="inner"
+
+--inner
+Content-Type: text/plain; charset="utf-8"
+
+Proposed supplier_id change; pending review.
+> Earlier suggestion was to keep legacy_id.
+--inner
+Content-Type: text/html; charset="utf-8"
+
+<p>Proposed supplier_id change; pending review.</p><img src="cid:missing-chart">
+--inner--
+--outer
+Content-Type: application/pdf; name="model.pdf"
+Content-Disposition: attachment; filename="model.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQK
+--outer--

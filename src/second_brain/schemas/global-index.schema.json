@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "global-index",
+  "description": "Rebuildable approved-release lookup. Nested record content is checked by re-rendering from authorized checked releases; reviewed proposals remain proposals.",
+  "type": "object",
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_type": {"const": "approved_release_index"},
+    "generation_id": {"type": "string", "pattern": "^IDX-[a-f0-9]{24}$"},
+    "information_domain": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+    "access_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "registry_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "include_history": {"type": "boolean"},
+    "projects": {"type": "array", "minItems": 1, "items": {"type": "object", "properties": {
+      "project_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+      "name": {"type": "string", "minLength": 1},
+      "information_domain": {"type": "string", "minLength": 1},
+      "ownership_references": {"type": "array", "items": {"type": "object", "properties": {
+        "source_id": {"type": "string", "minLength": 1}, "pattern": {"type": "string", "minLength": 1}
+      }, "required": ["source_id", "pattern"], "additionalProperties": false}},
+      "config_path": {"type": "string", "minLength": 1},
+      "config_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "source_scope_sha256": {"anyOf": [{"type": "string", "pattern": "^[a-f0-9]{64}$"}, {"type": "null"}]},
+      "current_run_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+      "current_pointer_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "history_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    }, "required": ["project_id", "name", "information_domain", "ownership_references", "config_path", "config_sha256", "source_scope_sha256", "current_run_id", "current_pointer_sha256", "history_sha256"], "additionalProperties": false}},
+    "releases": {"type": "array", "minItems": 1, "items": {"type": "object", "properties": {
+      "project_id": {"type": "string", "minLength": 1},
+      "run_id": {"type": "string", "minLength": 1},
+      "visibility": {"enum": ["current", "historical"]},
+      "release_path": {"type": "string", "minLength": 1},
+      "manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "records_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "review_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "review_report_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "work_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    }, "required": ["project_id", "run_id", "visibility", "release_path", "manifest_sha256", "records_sha256", "review_sha256", "review_report_sha256", "work_sha256"], "additionalProperties": false}},
+    "entries": {"type": "array", "items": {"type": "object", "properties": {
+      "key": {"type": "string", "minLength": 1},
+      "project_id": {"type": "string", "minLength": 1},
+      "run_id": {"type": "string", "minLength": 1},
+      "record_id": {"type": "string", "pattern": "^(REQ|DEC|UNC|INV)-[0-9]{3,6}$"},
+      "visibility": {"enum": ["current", "historical"]},
+      "review_status": {"const": "human_reviewed_snapshot"},
+      "record_schema_version": {"type": "string", "minLength": 1},
+      "record_path": {"type": "string", "minLength": 1},
+      "record_index": {"type": "integer", "minimum": 0},
+      "record": {"type": "object"},
+      "evidence_links": {"type": "array", "items": {"type": "object", "properties": {
+        "role": {"enum": ["record", "finding"]},
+        "finding_index": {"anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "citation_index": {"type": "integer", "minimum": 0},
+        "evidence_id": {"type": "string", "pattern": "^E-[a-f0-9]{24}$"},
+        "segment_id": {"anyOf": [{"type": "string", "pattern": "^S-[a-f0-9]{24}$"}, {"type": "null"}]},
+        "source_id": {"type": "string", "minLength": 1},
+        "source_type": {"type": "string", "minLength": 1},
+        "relative_path": {"type": "string", "minLength": 1},
+        "snapshot_path": {"type": "string", "minLength": 1},
+        "original_snapshot_path": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "metadata_path": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "original_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "representation_sha256": {"anyOf": [{"type": "string", "pattern": "^[a-f0-9]{64}$"}, {"type": "null"}]},
+        "original_locator": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "start_line": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1}
+      }, "required": ["role", "finding_index", "citation_index", "evidence_id", "segment_id", "source_id", "source_type", "relative_path", "snapshot_path", "original_snapshot_path", "metadata_path", "original_sha256", "representation_sha256", "original_locator", "start_line", "end_line"], "additionalProperties": false}}
+    }, "required": ["key", "project_id", "run_id", "record_id", "visibility", "review_status", "record_schema_version", "record_path", "record_index", "record", "evidence_links"], "additionalProperties": false}}
+  },
+  "required": ["schema_version", "artifact_type", "generation_id", "information_domain", "access_sha256", "registry_sha256", "include_history", "projects", "releases", "entries"],
+  "additionalProperties": false
+}

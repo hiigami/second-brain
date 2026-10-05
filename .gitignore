@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+# Operator workspaces are private: configuration, policies, registries,
+# permissions, provenance, evidence, proposals, and approved knowledge.
+# Synthetic fixtures stay versioned under tests/fixtures/.
+/projects/
+
+# Environment values and local assistant configuration are machine-specific.
+.env
+.env.*
+.claude/*
+!.claude/skills/
+
+# Keep shared skills; exclude local assistant work and state.
+.coda/*
+!.coda/skills/
+.agents/*
+!.agents/skills/

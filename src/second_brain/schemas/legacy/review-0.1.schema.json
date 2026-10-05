@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "review",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "approve",
+        "changes_requested"
+      ]
+    },
+    "reviewer": {
+      "type": "string"
+    },
+    "reviewed_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 20
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "records_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "previous_release_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "approved_record_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(REQ|DEC|UNC|INV)-[0-9]{3,6}$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "removed_record_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(REQ|DEC|UNC|INV)-[0-9]{3,6}$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "acknowledged_issue_codes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "checks": {
+      "type": "object",
+      "properties": {
+        "evidence_support": {
+          "type": "boolean"
+        },
+        "conflicts_explicit": {
+          "type": "boolean"
+        },
+        "source_authority_checked": {
+          "type": "boolean"
+        },
+        "privacy_checked": {
+          "type": "boolean"
+        },
+        "snapshot_completeness_checked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "evidence_support",
+        "conflicts_explicit",
+        "source_authority_checked",
+        "privacy_checked",
+        "snapshot_completeness_checked"
+      ],
+      "additionalProperties": false
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "run_id",
+    "decision",
+    "reviewer",
+    "reviewed_at",
+    "manifest_sha256",
+    "records_sha256",
+    "previous_release_id",
+    "approved_record_ids",
+    "removed_record_ids",
+    "acknowledged_issue_codes",
+    "checks",
+    "notes"
+  ],
+  "additionalProperties": false
+}

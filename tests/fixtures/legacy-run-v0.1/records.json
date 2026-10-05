@@ -1,0 +1,203 @@
+{
+  "schema_version": "0.1",
+  "project_id": "demo",
+  "run_id": "build-demo-final",
+  "coverage": [
+    {
+      "evidence_id": "E-3a01c1580cac897153f50234",
+      "disposition": "used",
+      "note": "Synthetic expected-output example; not an LLM extraction or human review."
+    },
+    {
+      "evidence_id": "E-6731585bbe77f30b853f59d7",
+      "disposition": "used",
+      "note": "Synthetic expected-output example; not an LLM extraction or human review."
+    },
+    {
+      "evidence_id": "E-ebc90b1dc0cb95af0dc8ed54",
+      "disposition": "used",
+      "note": "Synthetic expected-output example; not an LLM extraction or human review."
+    },
+    {
+      "evidence_id": "E-8ecf50455d4d8144e093731e",
+      "disposition": "used",
+      "note": "Synthetic expected-output example; not an LLM extraction or human review."
+    },
+    {
+      "evidence_id": "E-0b3639bb14f458a978d8f72a",
+      "disposition": "used",
+      "note": "Synthetic expected-output example; not an LLM extraction or human review."
+    }
+  ],
+  "records": [
+    {
+      "id": "REQ-001",
+      "kind": "requirement",
+      "title": "Synthetic candidate limit",
+      "statement": "The fixture states a maximum of 10 candidates per response.",
+      "epistemic_status": "observed",
+      "evidence": [
+        {
+          "evidence_id": "E-8ecf50455d4d8144e093731e",
+          "start_line": 3,
+          "end_line": 3,
+          "quote": "The interactive search response must contain at most 10 candidates."
+        }
+      ],
+      "relations": [],
+      "open_questions": [],
+      "investigation": null
+    },
+    {
+      "id": "REQ-002",
+      "kind": "requirement",
+      "title": "Synthetic no-results behavior",
+      "statement": "The fixture requires an explicit no-results response.",
+      "epistemic_status": "observed",
+      "evidence": [
+        {
+          "evidence_id": "E-8ecf50455d4d8144e093731e",
+          "start_line": 4,
+          "end_line": 4,
+          "quote": "When there are no matching candidates, the response must explicitly say that no results were found."
+        }
+      ],
+      "relations": [],
+      "open_questions": [],
+      "investigation": null
+    },
+    {
+      "id": "DEC-001",
+      "kind": "decision",
+      "title": "Synthetic recorded backend decision",
+      "statement": "The architecture fixture records Azure Search as the only search backend; this does not establish any real project's decision.",
+      "epistemic_status": "observed",
+      "evidence": [
+        {
+          "evidence_id": "E-3a01c1580cac897153f50234",
+          "start_line": 3,
+          "end_line": 4,
+          "quote": "Recorded decision: the search backend is Azure Search only.\nThis pilot must not execute production SQL or change any source repository."
+        }
+      ],
+      "relations": [],
+      "open_questions": [],
+      "investigation": null
+    },
+    {
+      "id": "UNC-001",
+      "kind": "uncertainty",
+      "title": "Proposed limit conflicts with stated limit",
+      "statement": "A Spanish meeting fixture proposes 20 candidates without approval, while the requirement fixture states 10. Approval authority is unresolved.",
+      "epistemic_status": "unresolved",
+      "evidence": [
+        {
+          "evidence_id": "E-8ecf50455d4d8144e093731e",
+          "start_line": 3,
+          "end_line": 3,
+          "quote": "The interactive search response must contain at most 10 candidates."
+        },
+        {
+          "evidence_id": "E-6731585bbe77f30b853f59d7",
+          "start_line": 3,
+          "end_line": 4,
+          "quote": "PROPUESTA (no aprobada): ampliar el límite de candidatos de 10 a 20.\nPREGUNTA ABIERTA: ¿quién tiene autoridad para aprobar el cambio de límite?"
+        }
+      ],
+      "relations": [
+        {
+          "type": "conflicts_with",
+          "target": "REQ-001"
+        }
+      ],
+      "open_questions": [
+        "Who can approve the change, and has the requirement owner accepted it?"
+      ],
+      "investigation": null
+    },
+    {
+      "id": "INV-001",
+      "kind": "investigation",
+      "title": "Trace the candidate limit in bounded code/schema fixtures",
+      "statement": "The inspected formatter uses a limit of 10. The inspected schema defines material identity and name, not a candidate-limit setting. This static evidence cannot establish end-to-end behavior or approve 20.",
+      "epistemic_status": "interpretation",
+      "evidence": [
+        {
+          "evidence_id": "E-ebc90b1dc0cb95af0dc8ed54",
+          "start_line": 3,
+          "end_line": 6,
+          "quote": "MAX_RESULTS = 10\n\ndef format_candidates(items):\n    return items[:MAX_RESULTS]"
+        },
+        {
+          "evidence_id": "E-0b3639bb14f458a978d8f72a",
+          "start_line": 2,
+          "end_line": 5,
+          "quote": "CREATE TABLE material (\n    material_code TEXT PRIMARY KEY,\n    name TEXT NOT NULL\n);"
+        }
+      ],
+      "relations": [
+        {
+          "type": "investigates",
+          "target": "REQ-001"
+        },
+        {
+          "type": "investigates",
+          "target": "UNC-001"
+        }
+      ],
+      "open_questions": [
+        "Would changing the limit affect pagination, performance, or other callers?"
+      ],
+      "investigation": {
+        "question": "Can the proposed candidate-limit change be justified using only the scoped code and schema fixtures?",
+        "scope": [
+          "E-8ecf50455d4d8144e093731e",
+          "E-6731585bbe77f30b853f59d7",
+          "E-0b3639bb14f458a978d8f72a",
+          "E-ebc90b1dc0cb95af0dc8ed54"
+        ],
+        "method": "Static inspection of the frozen lines only. No SQL or repository code was executed.",
+        "findings": [
+          {
+            "claim": "The formatter slices candidates using MAX_RESULTS = 10.",
+            "evidence": [
+              {
+                "evidence_id": "E-ebc90b1dc0cb95af0dc8ed54",
+                "start_line": 3,
+                "end_line": 6,
+                "quote": "MAX_RESULTS = 10\n\ndef format_candidates(items):\n    return items[:MAX_RESULTS]"
+              }
+            ]
+          },
+          {
+            "claim": "The complete inspected table definition contains material_code and name; it does not define a candidate-limit setting.",
+            "evidence": [
+              {
+                "evidence_id": "E-0b3639bb14f458a978d8f72a",
+                "start_line": 2,
+                "end_line": 5,
+                "quote": "CREATE TABLE material (\n    material_code TEXT PRIMARY KEY,\n    name TEXT NOT NULL\n);"
+              }
+            ]
+          },
+          {
+            "claim": "The proposal explicitly remains unapproved.",
+            "evidence": [
+              {
+                "evidence_id": "E-6731585bbe77f30b853f59d7",
+                "start_line": 3,
+                "end_line": 4,
+                "quote": "PROPUESTA (no aprobada): ampliar el límite de candidatos de 10 a 20.\nPREGUNTA ABIERTA: ¿quién tiene autoridad para aprobar el cambio de límite?"
+              }
+            ]
+          }
+        ],
+        "limitations": [
+          "Synthetic fixtures only; no production system or complete repository was inspected.",
+          "Static inspection does not verify performance, authorization, data contents, or runtime integration."
+        ],
+        "next_action": "Ask the requirement owner to resolve UNC-001 before proposing an implementation change."
+      }
+    }
+  ]
+}

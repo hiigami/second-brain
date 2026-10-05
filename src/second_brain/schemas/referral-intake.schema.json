@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "referral-intake",
+  "description": "Mutable target intake audit ledger, outside approved knowledge. Nested referrals, decisions, tasks and links also undergo semantic contract checks.",
+  "type": "object",
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "project_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+    "origin_scans": {"type": "array", "items": {"type": "object", "properties": {
+      "project_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+      "status": {"enum": ["checked", "stale", "unavailable", "unauthorized"]},
+      "run_id": {"anyOf": [{"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"}, {"type": "null"}]}
+    }, "required": ["project_id", "status", "run_id"], "additionalProperties": false}},
+    "items": {"type": "array", "items": {"type": "object", "properties": {
+      "id": {"type": "string", "pattern": "^INT-[a-f0-9]{24}$"},
+      "origin_project_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+      "origin_run_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+      "origin_review_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+      "referral": {"type": "object"},
+      "source_file": {"type": "object", "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "relative_path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "original_locator": {"type": "string", "minLength": 1}
+      }, "required": ["source_id", "relative_path", "sha256", "original_locator"], "additionalProperties": false},
+      "supersedes": {"anyOf": [{"type": "string", "pattern": "^INT-[a-f0-9]{24}$"}, {"type": "null"}]},
+      "source_status": {"enum": ["current", "superseded", "withdrawn", "stale", "unavailable", "unauthorized"]},
+      "observations": {"type": "array", "minItems": 1, "items": {"type": "object", "properties": {
+        "at": {"type": "string", "minLength": 1},
+        "status": {"enum": ["current", "superseded", "withdrawn", "stale", "unavailable", "unauthorized"]},
+        "reason": {"type": "string", "minLength": 1}
+      }, "required": ["at", "status", "reason"], "additionalProperties": false}},
+      "decisions": {"type": "array", "items": {"type": "object"}},
+      "capture_task": {"anyOf": [{"type": "object"}, {"type": "null"}]},
+      "target_links": {"type": "array", "items": {"type": "object", "properties": {
+        "review": {"type": "object"},
+        "evidence_comparison": {"type": "array", "minItems": 1, "items": {"type": "object", "properties": {
+          "record_id": {"type": "string", "pattern": "^(REQ|DEC|UNC|INV)-[0-9]{3,6}$"},
+          "evidence_id": {"type": "string", "pattern": "^E-[a-f0-9]{24}$"},
+          "original_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "representation_sha256": {"anyOf": [{"type": "string", "pattern": "^[a-f0-9]{64}$"}, {"type": "null"}]},
+          "original_locator": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+          "comparison": {"enum": ["same_representation_and_locator", "different_representation_or_locator", "scoped_export"]}
+        }, "required": ["record_id", "evidence_id", "original_sha256", "representation_sha256", "original_locator", "comparison"], "additionalProperties": false}}
+      }, "required": ["review", "evidence_comparison"], "additionalProperties": false}}
+    }, "required": ["id", "origin_project_id", "origin_run_id", "origin_review_sha256", "referral", "source_file", "supersedes", "source_status", "observations", "decisions", "capture_task", "target_links"], "additionalProperties": false}}
+  },
+  "required": ["schema_version", "project_id", "origin_scans", "items"],
+  "additionalProperties": false
+}

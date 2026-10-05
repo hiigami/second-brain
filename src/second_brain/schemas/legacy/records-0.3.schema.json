@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "records",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "0.1",
+        "0.2",
+        "0.3",
+        "0.4"
+      ]
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^E-[a-f0-9]{24}$"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "used",
+              "reviewed_no_record",
+              "deferred",
+              "triaged_out"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required for triaged_out (records 0.2), e.g. path_out_of_question_scope:<globs> or keyword_scan:<terms>; not allowed otherwise."
+          }
+        },
+        "required": [
+          "evidence_id",
+          "disposition",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "segment_coverage": {
+      "description": "Required by the checker for records 0.3; one disposition per frozen segment.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "segment_id": {"type": "string", "pattern": "^S-[a-f0-9]{24}$"},
+          "disposition": {"type": "string", "enum": ["used", "reviewed_no_record", "triaged_out", "deferred"]},
+          "note": {"type": "string", "minLength": 1},
+          "method": {"type": "string", "minLength": 1}
+        },
+        "required": ["segment_id", "disposition", "note"],
+        "additionalProperties": false
+      }
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(REQ|DEC|UNC|INV)-[0-9]{3,6}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "requirement",
+              "decision",
+              "uncertainty",
+              "investigation"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "epistemic_status": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "interpretation",
+              "proposal",
+              "unresolved"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "evidence_id": {
+                  "type": "string",
+                  "pattern": "^E-[a-f0-9]{24}$"
+                },
+                "segment_id": {"type": "string", "pattern": "^S-[a-f0-9]{24}$"},
+                "representation_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                "start_line": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "end_line": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "quote": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "evidence_id",
+                "start_line",
+                "end_line",
+                "quote"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1
+          },
+          "relations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "depends_on",
+                    "implements",
+                    "conflicts_with",
+                    "clarifies",
+                    "investigates",
+                    "supersedes"
+                  ]
+                },
+                "target": {
+                  "type": "string",
+                  "pattern": "^(REQ|DEC|UNC|INV)-[0-9]{3,6}$"
+                }
+              },
+              "required": [
+                "type",
+                "target"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0
+          },
+          "open_questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0
+          },
+          "events": {
+            "description": "Required for records 0.4. Events point to exact citations in this record's evidence array; date semantics remain subject to review.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "string", "pattern": "^EVT-[0-9]{3,6}$"},
+                "statement": {"type": "string", "minLength": 1},
+                "evidence_refs": {"type": "array", "items": {"type": "integer", "minimum": 0},
+                                  "minItems": 1, "uniqueItems": true},
+                "event_date": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "enum": ["known", "approximate", "unknown", "conflicting"]},
+                    "basis": {"type": "string", "enum": ["explicit_text", "relative_to_anchor", "not_stated", "conflicting_sources"]},
+                    "value": {"type": "string", "minLength": 4},
+                    "end": {"type": "string", "minLength": 4},
+                    "precision": {"type": "string", "enum": ["year", "month", "day", "minute", "second"]},
+                    "anchor_ref": {"type": "integer", "minimum": 0},
+                    "anchor_value": {"type": "string", "minLength": 4},
+                    "alternatives": {"type": "array", "items": {"type": "object", "properties": {
+                      "value": {"type": "string", "minLength": 4},
+                      "precision": {"type": "string", "enum": ["year", "month", "day", "minute", "second"]},
+                      "evidence_refs": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1, "uniqueItems": true}
+                    }, "required": ["value", "precision", "evidence_refs"], "additionalProperties": false}, "minItems": 2},
+                    "note": {"type": "string", "minLength": 1}
+                  },
+                  "required": ["status", "basis"],
+                  "additionalProperties": false
+                },
+                "effective_date": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "enum": ["known", "approximate", "unknown", "conflicting"]},
+                    "basis": {"type": "string", "enum": ["explicit_text", "relative_to_anchor", "not_stated", "conflicting_sources"]},
+                    "value": {"type": "string", "minLength": 4},
+                    "end": {"type": "string", "minLength": 4},
+                    "precision": {"type": "string", "enum": ["year", "month", "day", "minute", "second"]},
+                    "anchor_ref": {"type": "integer", "minimum": 0},
+                    "anchor_value": {"type": "string", "minLength": 4},
+                    "alternatives": {"type": "array", "items": {"type": "object", "properties": {
+                      "value": {"type": "string", "minLength": 4},
+                      "precision": {"type": "string", "enum": ["year", "month", "day", "minute", "second"]},
+                      "evidence_refs": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1, "uniqueItems": true}
+                    }, "required": ["value", "precision", "evidence_refs"], "additionalProperties": false}, "minItems": 2},
+                    "note": {"type": "string", "minLength": 1}
+                  },
+                  "required": ["status", "basis"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["id", "statement", "evidence_refs", "event_date"],
+              "additionalProperties": false
+            }
+          },
+          "investigation": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "scope": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^E-[a-f0-9]{24}$"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "method": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "findings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "claim": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "evidence_id": {
+                                "type": "string",
+                                "pattern": "^E-[a-f0-9]{24}$"
+                              },
+                              "segment_id": {"type": "string", "pattern": "^S-[a-f0-9]{24}$"},
+                              "representation_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                              "start_line": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "end_line": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "quote": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "evidence_id",
+                              "start_line",
+                              "end_line",
+                              "quote"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "minItems": 1
+                        }
+                      },
+                      "required": [
+                        "claim",
+                        "evidence"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  },
+                  "limitations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "next_action": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "question",
+                  "scope",
+                  "method",
+                  "findings",
+                  "limitations",
+                  "next_action"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "statement",
+          "epistemic_status",
+          "evidence",
+          "relations",
+          "open_questions",
+          "investigation"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    }
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "run_id",
+    "coverage",
+    "records"
+  ],
+  "additionalProperties": false
+}

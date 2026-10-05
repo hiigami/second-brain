@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "checked_at": "2026-09-30T20:36:03.147738+00:00",
+  "schemas_checked": 5,
+  "valid_examples_checked": 8,
+  "schema_mutations_compared": 643,
+  "schema_validator_disagreements": [],
+  "python_files_parsed_with_3_10_grammar": 10,
+  "local_markdown_links_checked": 44,
+  "broken_links": [],
+  "mermaid_renderer_executed": false,
+  "limits": [
+    "AST grammar parsing does not establish runtime compatibility with Python 3.10.",
+    "Mermaid labels and edge inputs are tested, but the user-specific renderer is not executed."
+  ]
+}

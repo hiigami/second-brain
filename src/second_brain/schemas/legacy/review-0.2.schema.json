@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "review",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "0.2"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "approve",
+        "changes_requested"
+      ]
+    },
+    "reviewer": {
+      "type": "string"
+    },
+    "reviewed_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 20
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "records_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "work_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Written by --prepare: digest of every (path, sha256, bytes) in the run's work/ folder; publication copies exactly that content."
+    },
+    "previous_release_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "approved_record_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(REQ|DEC|UNC|INV)-[0-9]{3,6}$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "removed_record_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(REQ|DEC|UNC|INV)-[0-9]{3,6}$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "warning_summary": {
+      "type": "object",
+      "description": "Written by kb_publish --prepare: digest of every (code, source_id, path) warning occurrence and counts per code.",
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "counts": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "required": [
+        "sha256",
+        "counts"
+      ],
+      "additionalProperties": false
+    },
+    "acknowledged_warnings": {
+      "type": "object",
+      "description": "Filled by the human reviewer: warning code -> occurrence count; must equal warning_summary.counts.",
+      "properties": {},
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "triaged_evidence_ids": {
+      "type": "array",
+      "description": "Written by --prepare: every coverage entry with disposition triaged_out.",
+      "items": {
+        "type": "string",
+        "pattern": "^E-[a-f0-9]{24}$"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "triage_acknowledged": {
+      "type": "boolean",
+      "description": "The reviewer accepts that triaged_out inputs were not read in full. Required true when triaged_evidence_ids is nonempty."
+    },
+    "checks": {
+      "type": "object",
+      "properties": {
+        "evidence_support": {
+          "type": "boolean"
+        },
+        "conflicts_explicit": {
+          "type": "boolean"
+        },
+        "source_authority_checked": {
+          "type": "boolean"
+        },
+        "privacy_checked": {
+          "type": "boolean"
+        },
+        "snapshot_completeness_checked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "evidence_support",
+        "conflicts_explicit",
+        "source_authority_checked",
+        "privacy_checked",
+        "snapshot_completeness_checked"
+      ],
+      "additionalProperties": false
+    },
+    "notes": {
+      "type": "string"
+    },
+    "prepared_at": {
+      "type": "string",
+      "minLength": 20,
+      "description": "Written by --prepare; reviewed_at must not precede it."
+    },
+    "rollback_reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Required to publish a capture older than CURRENT."
+    }
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "run_id",
+    "decision",
+    "reviewer",
+    "reviewed_at",
+    "manifest_sha256",
+    "records_sha256",
+    "work_sha256",
+    "previous_release_id",
+    "approved_record_ids",
+    "removed_record_ids",
+    "warning_summary",
+    "acknowledged_warnings",
+    "triaged_evidence_ids",
+    "triage_acknowledged",
+    "checks",
+    "notes"
+  ],
+  "additionalProperties": false
+}

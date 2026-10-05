@@ -1,0 +1,130 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "packet_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reviewer": {
+      "type": "string",
+      "maxLength": 16000
+    },
+    "reviewed_at": {
+      "type": "string",
+      "maxLength": 16000
+    },
+    "inventory_confirmed": {
+      "type": "boolean"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^V-[0-9]{4}$"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 16000
+                },
+                "status": {
+                  "enum": [
+                    "match",
+                    "omission",
+                    "unsupported",
+                    "unavailable",
+                    "unresolved"
+                  ]
+                },
+                "observation": {
+                  "type": "string",
+                  "maxLength": 16000
+                },
+                "region": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 67108864
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 16000
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "observation",
+                "region",
+                "note"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "elements"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^GAP-[0-9]{4}$"
+          },
+          "disposition": {
+            "enum": [
+              "acknowledged_unavailable",
+              "unresolved"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 16000
+          }
+        },
+        "required": [
+          "id",
+          "disposition",
+          "note"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "packet_sha256",
+    "reviewer",
+    "reviewed_at",
+    "inventory_confirmed",
+    "items",
+    "issues"
+  ],
+  "additionalProperties": false
+}

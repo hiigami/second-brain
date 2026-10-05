@@ -1,0 +1,195 @@
+{
+  "schema_version": "0.1",
+  "tool_version": "0.1.0",
+  "project_id": "demo",
+  "run_id": "build-demo-final",
+  "created_at": "2026-09-30T20:33:04+00:00",
+  "config_sha256": "323abb041ab2e4bd72b2865a95a5d0ed8931613b56e5174055f88b68c649b351",
+  "scope_sha256": "64639892d0df8a4a57e40b87ba53c597d2dae7d9d6eecdf357bf4a3c7c45b72f",
+  "config_snapshot": "project.snapshot.json",
+  "status": "ready",
+  "limits": {
+    "max_file_bytes": 2000000,
+    "max_total_bytes": 50000000,
+    "max_files": 2000
+  },
+  "sources": [
+    {
+      "id": "architecture",
+      "type": "architecture",
+      "root": "/mnt/data/work-second-brain-stage2/fixtures/demo-sources/architecture",
+      "eligible_count": 1,
+      "excluded_entries": 0
+    },
+    {
+      "id": "meetings",
+      "type": "meetings",
+      "root": "/mnt/data/work-second-brain-stage2/fixtures/demo-sources/meetings",
+      "eligible_count": 1,
+      "excluded_entries": 0
+    },
+    {
+      "id": "repository",
+      "type": "repository",
+      "root": "/mnt/data/work-second-brain-stage2/fixtures/demo-sources/repository",
+      "eligible_count": 1,
+      "excluded_entries": 0
+    },
+    {
+      "id": "requirements",
+      "type": "requirements",
+      "root": "/mnt/data/work-second-brain-stage2/fixtures/demo-sources/requirements",
+      "eligible_count": 1,
+      "excluded_entries": 0
+    },
+    {
+      "id": "sql",
+      "type": "sql",
+      "root": "/mnt/data/work-second-brain-stage2/fixtures/demo-sources/sql",
+      "eligible_count": 1,
+      "excluded_entries": 0
+    }
+  ],
+  "files": [
+    {
+      "evidence_id": "E-3a01c1580cac897153f50234",
+      "logical_id": "F-3e1e0e37e404d5f114c8fa2c",
+      "source_id": "architecture",
+      "source_type": "architecture",
+      "relative_path": "decision.md",
+      "sha256": "1f5e320b76dda7415623afce1e7676ffd5dfe8e02f7ec3057ee6beb7d18fa082",
+      "bytes": 183,
+      "line_count": 4,
+      "encoding": "utf-8",
+      "snapshot_path": "snapshots/E-3a01c1580cac897153f50234.txt",
+      "provenance": {
+        "kind": "local_file",
+        "id": "synthetic-fixture:architecture/decision.md",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    },
+    {
+      "evidence_id": "E-6731585bbe77f30b853f59d7",
+      "logical_id": "F-657d921327a0cf863e585b72",
+      "source_id": "meetings",
+      "source_type": "meetings",
+      "relative_path": "meeting.md",
+      "sha256": "eb57f1958420ea923f9e09f6c24860b7bb4efc66ec2d36b3e2c8f8d8b4f8c3b1",
+      "bytes": 192,
+      "line_count": 4,
+      "encoding": "utf-8",
+      "snapshot_path": "snapshots/E-6731585bbe77f30b853f59d7.txt",
+      "provenance": {
+        "kind": "local_file",
+        "id": "synthetic-fixture:meetings/meeting.md",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    },
+    {
+      "evidence_id": "E-ebc90b1dc0cb95af0dc8ed54",
+      "logical_id": "F-25155ddf673a6c246729a8a0",
+      "source_id": "repository",
+      "source_type": "repository",
+      "relative_path": "src/search.py",
+      "sha256": "b7523676f2fd7314e186cb33aa3e27154b8ec2574133d72849c217d4880e0790",
+      "bytes": 143,
+      "line_count": 6,
+      "encoding": "utf-8",
+      "snapshot_path": "snapshots/E-ebc90b1dc0cb95af0dc8ed54.txt",
+      "provenance": {
+        "kind": "repository",
+        "id": "synthetic-fixture:repository/src/search.py",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    },
+    {
+      "evidence_id": "E-8ecf50455d4d8144e093731e",
+      "logical_id": "F-acf4999671546dfc1790089a",
+      "source_id": "requirements",
+      "source_type": "requirements",
+      "relative_path": "requirements.md",
+      "sha256": "b9ca9ff2fe48690a7402defdbcc7b4c87b7c03386afe0cd819ec4b8b71cd5c14",
+      "bytes": 218,
+      "line_count": 4,
+      "encoding": "utf-8",
+      "snapshot_path": "snapshots/E-8ecf50455d4d8144e093731e.txt",
+      "provenance": {
+        "kind": "local_file",
+        "id": "synthetic-fixture:requirements/requirements.md",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    },
+    {
+      "evidence_id": "E-0b3639bb14f458a978d8f72a",
+      "logical_id": "F-00cf9ac96d57206b5978b5f6",
+      "source_id": "sql",
+      "source_type": "sql",
+      "relative_path": "schema.sql",
+      "sha256": "16085587c70e1ae4f66207ae9c2442eec75e2b3c969e6f82bc31ba2587f24da5",
+      "bytes": 155,
+      "line_count": 5,
+      "encoding": "utf-8",
+      "snapshot_path": "snapshots/E-0b3639bb14f458a978d8f72a.txt",
+      "provenance": {
+        "kind": "local_file",
+        "id": "synthetic-fixture:sql/schema.sql",
+        "url": null,
+        "revision": "synthetic-v1 (fixture label, not a Git commit)",
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "not_applicable",
+          "comments": "not_applicable",
+          "suggestions": "not_applicable"
+        },
+        "limitations": []
+      }
+    }
+  ],
+  "issues": [],
+  "delta": {
+    "baseline_run_id": null,
+    "compatible": null,
+    "added": [
+      "F-00cf9ac96d57206b5978b5f6",
+      "F-25155ddf673a6c246729a8a0",
+      "F-3e1e0e37e404d5f114c8fa2c",
+      "F-657d921327a0cf863e585b72",
+      "F-acf4999671546dfc1790089a"
+    ],
+    "modified": [],
+    "removed": [],
+    "unchanged": []
+  }
+}

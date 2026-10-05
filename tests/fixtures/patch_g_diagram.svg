@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 240 120">
+  <title>Supplier link draft</title>
+  <desc>Caption says one-to-one; source label below says 1:N, pending review.</desc>
+  <defs><marker id="arrow"><path d="M0,0 L6,3 L0,6"/></marker></defs>
+  <rect id="supplier" x="10" y="20" width="80" height="40"/>
+  <text x="20" y="45">Supplier</text>
+  <rect id="invoice" x="150" y="20" width="80" height="40"/>
+  <text x="165" y="45">Invoice</text>
+  <line id="supplier-invoice" x1="90" y1="40" x2="150" y2="40" marker-end="url(#arrow)"/>
+  <text x="112" y="35" opacity="0.05">1:N</text>
+  <image x="20" y="80" width="30" height="20" xlink:href="https://invalid.example/missing.png"/>
+</svg>

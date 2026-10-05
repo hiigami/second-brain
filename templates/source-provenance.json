@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.1",
+  "entries": [
+    {
+      "source_id": "requirements",
+      "relative_path": "requirements.md",
+      "origin": {
+        "kind": "google_docs",
+        "id": null,
+        "url": null,
+        "revision": null,
+        "captured_at": "2026-09-30T00:00:00+00:00",
+        "features": {
+          "tabs": "unknown",
+          "comments": "unknown",
+          "suggestions": "unknown"
+        },
+        "limitations": [
+          "TEMPLATE ONLY: replace captured_at and metadata after verifying the actual export. No fidelity has been established."
+        ]
+      }
+    }
+  ]
+}
