@@ -8,8 +8,15 @@ test, a renderer, or a human transcription cannot prove GLM visual access.
 
 ## Prepare a synthetic review packet
 
-The command currently requires Linux (resource limits and atomic no-replace
-rename), Python 3.14, and the optional uv extra. SVG also needs a usable native
+The command requires Linux or macOS, Python 3.14, and the optional uv extra.
+Both platforms use native atomic no-replace rename and enforce CPU, file-size
+and wall-clock limits. Linux also imposes a 512 MiB address-space cap; macOS
+omits that cap because the interpreter's virtual size can already exceed it.
+The macOS packet records this limitation. Tighter inherited resource limits
+remain in force on both platforms. Verification accepts either recognized
+producer limitation profile on either platform; assessment and export retain
+the limitations recorded in the packet. Unknown or incomplete profiles are
+rejected. SVG also needs a usable native
 Cairo library; missing renderers produce explicit unavailable issues. PDF rendering
 requires an explicitly selected trusted local Poppler `pdftoppm` executable.
 There is no automatic installation or document conversion at runtime.
@@ -27,7 +34,12 @@ uv run --locked --extra visual second-brain visual-review verify \
 
 These commands require a fresh output directory and an existing parent. Choose
 a new output name for a later packet; preparation never overwrites one. The
-synthetic preparation/verification commands were exercised locally. Review the
+paths must contain no symlinks, including parent directories. On macOS, use
+`/private/tmp` instead of `/tmp` in these examples; for a system temporary path
+under `/var`, select its canonical `/private/var` path. Do not resolve an
+untrusted source symlink to bypass the source-path guard. The synthetic
+preparation/verification commands were exercised locally on Linux; native
+macOS verification remains pending. Review the
 actual packet, not just command success. Open `index.html` locally for its PNG
 previews, read `review.md`, and inspect the exact original bytes separately with
 a trusted viewer. Originals are copied into inert `originals/*.bin` files; their

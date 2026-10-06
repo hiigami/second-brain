@@ -1,14 +1,18 @@
 """Local visual preparation checks; no model calls or invented human scores."""
 import copy
+import ctypes
+import errno
 import io
 import importlib.util
 import json
+import os
+import resource
 import subprocess
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 from second_brain import kb_visual_review as visual
 from second_brain.kb_common import KBError
@@ -21,7 +25,8 @@ class VisualReviewTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        # macOS temporary directories commonly use the /var -> /private/var alias.
+        self.root = Path(self.temp.name).resolve()
 
     def source(self, name, data):
         path = self.root / name
@@ -100,8 +105,9 @@ class VisualReviewTests(unittest.TestCase):
         with self.assertRaises(KBError):
             visual.prepare([link], self.root / "packet")
 
-    def assessment(self, packet):
-        result = copy.deepcopy(json.loads((self.root / "packet/assessment.template.json").read_text()))
+    def assessment(self, packet, packet_root=None):
+        packet_root = packet_root if packet_root is not None else self.root / "packet"
+        result = copy.deepcopy(json.loads((packet_root / "assessment.template.json").read_text()))
         result["reviewer"] = "Synthetic test reviewer"
         result["reviewed_at"] = packet["created_at"]
         result["inventory_confirmed"] = True
@@ -284,6 +290,108 @@ class VisualReviewTests(unittest.TestCase):
             visual.commit_directory(stage, out)
         self.assertTrue(stage.is_dir())
         self.assertTrue(out.is_dir())
+
+    def test_macos_commit_uses_exclusive_rename(self):
+        stage = self.root / "stage"
+        stage.mkdir()
+        out = self.root / "out"
+        libc = Mock(spec=["renamex_np"])
+        libc.renamex_np.return_value = 0
+        with patch.object(visual.sys, "platform", "darwin"), patch.object(visual.ctypes, "CDLL", return_value=libc):
+            visual.commit_directory(stage, out)
+        libc.renamex_np.assert_called_once_with(os.fsencode(stage), os.fsencode(out), 0x00000004)
+
+    def test_macos_concurrent_output_is_preserved(self):
+        stage = self.root / "stage"
+        stage.mkdir()
+        (stage / "original.txt").write_text("staged")
+        out = self.root / "out"
+        libc = Mock(spec=["renamex_np"])
+
+        def concurrent_output(*args):
+            out.mkdir()
+            ctypes.set_errno(errno.EEXIST)
+            return -1
+
+        libc.renamex_np.side_effect = concurrent_output
+        with patch.object(visual.sys, "platform", "darwin"), patch.object(visual.ctypes, "CDLL", return_value=libc):
+            with self.assertRaisesRegex(KBError, "concurrently"):
+                visual.commit_directory(stage, out)
+        self.assertEqual((stage / "original.txt").read_text(), "staged")
+        self.assertTrue(out.is_dir())
+
+    def test_missing_macos_exclusive_rename_fails_closed(self):
+        stage = self.root / "stage"
+        stage.mkdir()
+        out = self.root / "out"
+        with patch.object(visual.sys, "platform", "darwin"), patch.object(visual.ctypes, "CDLL", return_value=Mock(spec=[])):
+            with self.assertRaisesRegex(KBError, "atomic no-replace"):
+                visual.commit_directory(stage, out)
+        self.assertTrue(stage.is_dir())
+        self.assertFalse(out.exists())
+
+    def test_worker_limits_keep_tighter_inherited_limits(self):
+        for platform in ("linux", "darwin"):
+            with self.subTest(platform=platform):
+                inherited = {resource.RLIMIT_AS: (128 * 1024 * 1024, 256 * 1024 * 1024),
+                             resource.RLIMIT_CPU: (10, 20), resource.RLIMIT_FSIZE: (1024, 2048)}
+                with patch.object(visual.sys, "platform", platform), patch.object(resource, "getrlimit", side_effect=inherited.__getitem__), patch.object(resource, "setrlimit") as setter:
+                    visual.set_worker_limits()
+                expected = [call(resource.RLIMIT_CPU, (10, 20)), call(resource.RLIMIT_FSIZE, (1024, 2048))]
+                if platform == "linux":
+                    expected.insert(0, call(resource.RLIMIT_AS, inherited[resource.RLIMIT_AS]))
+                self.assertEqual(setter.call_args_list, expected)
+
+    def test_worker_limits_bound_unlimited_resources(self):
+        for platform in ("linux", "darwin"):
+            with self.subTest(platform=platform):
+                with patch.object(visual.sys, "platform", platform), patch.object(resource, "getrlimit", return_value=(resource.RLIM_INFINITY,) * 2), patch.object(resource, "setrlimit") as setter:
+                    visual.set_worker_limits()
+                expected = [call(resource.RLIMIT_CPU, (60, 60)), call(resource.RLIMIT_FSIZE, (16 * 1024 * 1024,) * 2)]
+                if platform == "linux":
+                    expected.insert(0, call(resource.RLIMIT_AS, (512 * 1024 * 1024,) * 2))
+                self.assertEqual(setter.call_args_list, expected)
+
+    def test_packet_limitations_travel_with_producer_profile(self):
+        profiles = {"linux": visual.BASE_LIMITATIONS, "darwin": visual.MACOS_LIMITATIONS}
+        source = ROOT / "tests/fixtures/patch_g_visual_probe.png"
+        for producer, producer_profile in profiles.items():
+            packet_root = self.root / f"packet-{producer}"
+            with patch.object(visual, "LIMITATIONS", producer_profile):
+                packet = visual.prepare([source], packet_root)
+            assessment = self.assessment(packet, packet_root)
+            for consumer, consumer_profile in profiles.items():
+                with self.subTest(producer=producer, consumer=consumer):
+                    output = self.root / f"export-{producer}-{consumer}"
+                    with patch.object(visual, "LIMITATIONS", consumer_profile):
+                        self.assertEqual(visual.verify(packet_root), packet)
+                        result = visual.assess(packet_root, assessment)
+                        self.assertEqual(result["limitations"], producer_profile)
+                        exported = visual.export(packet_root, assessment, output)
+                    self.assertEqual(exported["limitations"], producer_profile)
+                    provenance = json.loads((output / "provenance.json").read_text())
+                    self.assertEqual(provenance["limitations"], producer_profile)
+                    self.assertEqual(provenance["packet_manifest"]["limitations"], producer_profile)
+                    text = (output / "transcription.md").read_text()
+                    for limitation in producer_profile:
+                        self.assertIn(limitation, text)
+                    if producer == "linux":
+                        self.assertNotIn(profiles["darwin"][-1], text)
+
+    def test_packet_rejects_unknown_or_incomplete_limitations(self):
+        packet = self.packet(ROOT / "tests/fixtures/patch_g_visual_probe.png")
+        packet_root = self.root / "packet"
+        required = visual.BASE_LIMITATIONS
+        profiles = ([], required[:-1], [*required, "Unknown worker guarantees"],
+                    list(reversed(required)), [*required, required[0]])
+        for profile in profiles:
+            with self.subTest(profile=profile):
+                changed = copy.deepcopy(packet)
+                changed["limitations"] = profile
+                visual.write(packet_root / "packet.json", changed)
+                (packet_root / "packet.sha256").write_text(visual.sha(visual.encoded(changed)) + "\n")
+                with self.assertRaisesRegex(KBError, "Unsupported visual packet contract"):
+                    visual.verify(packet_root)
 
     def test_export_refuses_a_different_packet_generation(self):
         packet = self.packet(ROOT / "tests/fixtures/patch_g_visual_probe.png")

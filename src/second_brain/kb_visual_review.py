@@ -24,12 +24,15 @@ from .kb_visual_render import MAX_BYTES, MAX_DIMENSION, MAX_ITEMS, MAX_PAGES, MA
 
 VERSION = "1.0"
 MAX_PACKET_BYTES = 64 * 1024 * 1024
-LIMITATIONS = [
+BASE_LIMITATIONS = [
     "Rendered previews require human comparison with the originals; rendering is not fidelity or semantic validation.",
     "Human inventory declarations and reviewer names are not authenticated by this command.",
     "No GLM capability result, business approval, scope authorization or publication is produced.",
     "The bounded worker is defense in depth, not a general hostile-file sandbox.",
 ]
+MACOS_LIMITATIONS = [*BASE_LIMITATIONS,
+    "The macOS worker has CPU, file-size and wall-clock limits but no imposed address-space cap; input and renderer budgets still apply."]
+LIMITATIONS = MACOS_LIMITATIONS if sys.platform == "darwin" else BASE_LIMITATIONS
 
 
 def sha(data):
@@ -71,15 +74,24 @@ def output_path(out, sources=()):
 
 
 def commit_directory(stage, out):
-    """Atomic Linux no-replace rename, including concurrently created empty dirs."""
+    """Atomic no-replace rename on Linux/macOS, including concurrent empty dirs."""
     output_path(out)
     try:
-        rename = ctypes.CDLL(None, use_errno=True).renameat2
+        libc = ctypes.CDLL(None, use_errno=True)
+        if sys.platform == "linux":
+            rename = libc.renameat2
+            rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+            args = (-100, os.fsencode(stage), -100, os.fsencode(out), 1)  # AT_FDCWD, RENAME_NOREPLACE
+        elif sys.platform == "darwin":
+            rename = libc.renamex_np
+            rename.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+            args = (os.fsencode(stage), os.fsencode(out), 0x00000004)  # RENAME_EXCL
+        else:
+            raise KBError("Visual packet creation requires Linux or macOS atomic no-replace support")
     except AttributeError as exc:
-        raise KBError("Visual packet creation needs Linux renameat2 no-replace support") from exc
-    rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        raise KBError("Visual packet creation needs native atomic no-replace rename support") from exc
     rename.restype = ctypes.c_int
-    if rename(-100, os.fsencode(stage), -100, os.fsencode(out), 1) != 0:
+    if rename(*args) != 0:
         error = ctypes.get_errno()
         if error == errno.EEXIST:
             raise KBError("Refusing to overwrite an output created concurrently")
@@ -184,10 +196,10 @@ def prepare(sources, out, pdftoppm=None):
         packet = {"schema_version": VERSION, "created_at": utc_now(), "renderers": renderer_versions,
                   "limits": {"source_bytes": MAX_BYTES, "image_pixels": MAX_PIXELS, "max_dimension": MAX_DIMENSION,
                              "max_items": MAX_ITEMS, "max_pdf_pages": MAX_PAGES, "worker_seconds": 90},
-                  "sources": inventory, "items": result["items"], "issues": result["issues"], "limitations": LIMITATIONS,
+                  "sources": inventory, "items": result["items"], "issues": result["issues"], "limitations": list(LIMITATIONS),
                   "files": {}}
         (stage / "index.html").write_bytes(index_page(packet))
-        review = ["# Local visual review — human assessment pending", "", *LIMITATIONS,
+        review = ["# Local visual review — human assessment pending", "", *packet["limitations"],
                   "", "Open index.html in a trusted local browser to inspect the raster previews. Originals are inert .bin copies.",
                   "Copy assessment.template.json outside this packet before entering reviewer identity, time, material elements and gap dispositions.", ""]
         for item in packet["items"]:
@@ -236,7 +248,7 @@ def verify(root):
     if sha(encoded(packet)) != digest:
         raise KBError("Packet manifest must use the canonical encoding")
     contract(packet, "visual-packet")
-    if packet.get("schema_version") != VERSION or packet.get("limitations") != LIMITATIONS:
+    if packet.get("schema_version") != VERSION or packet.get("limitations") not in (BASE_LIMITATIONS, MACOS_LIMITATIONS):
         raise KBError("Unsupported visual packet contract")
     parse_ts(packet["created_at"])
     files = packet["files"]
@@ -344,7 +356,7 @@ def assess(root, assessment):
             "human_fidelity": {"matched_elements": counts["match"], "declared_elements": total,
                                "match_fraction": counts["match"] / total if total else None,
                                "basis": "Human-declared material elements; unresolved/omitted elements remain in denominator. Gaps remain separate."},
-            "glm_capability": "unverified", "limitations": LIMITATIONS}
+            "glm_capability": "unverified", "limitations": packet["limitations"]}
 
 
 def export(root, assessment, out):
@@ -394,12 +406,26 @@ def export(root, assessment, out):
             shutil.rmtree(stage)
 
 
-def worker(root):
+def set_worker_limits():
+    """Apply platform budgets without relaxing inherited soft or hard limits."""
     import resource
+    if sys.platform not in ("linux", "darwin"):
+        raise KBError("Visual worker resource controls require Linux or macOS")
+    limits = [(resource.RLIMIT_CPU, 60), (resource.RLIMIT_FSIZE, 16 * 1024 * 1024)]
+    if sys.platform == "linux":
+        limits.insert(0, (resource.RLIMIT_AS, 512 * 1024 * 1024))
+    # Darwin can reject lowering RLIMIT_AS below the interpreter's virtual size.
+    # The packet discloses the absent cap; retain all other budgets and controls.
+    for kind, budget in limits:
+        soft, hard = resource.getrlimit(kind)
+        hard = budget if hard == resource.RLIM_INFINITY else min(hard, budget)
+        soft = hard if soft == resource.RLIM_INFINITY else min(soft, hard)
+        resource.setrlimit(kind, (soft, hard))
+
+
+def worker(root):
+    set_worker_limits()
     from .kb_visual_render import Renderer
-    resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024,) * 2)
-    resource.setrlimit(resource.RLIMIT_CPU, (60, 60))
-    resource.setrlimit(resource.RLIMIT_FSIZE, (16 * 1024 * 1024,) * 2)
     root = Path(root)
     config = read_json(root / ".worker.json")
     converter = config["pdftoppm"]
