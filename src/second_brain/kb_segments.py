@@ -46,6 +46,10 @@ def build_segment_inventory(run: Path, manifest: dict) -> dict:
                                "locator": issue.get("locator"),
                                "status": "unavailable" if code in {
                                    "docx_embedded_image_not_extracted", "docx_ancillary_parts_not_extracted",
+                                   "docx_comment_parts_unavailable", "docx_comment_extensions_unavailable",
+                                   "docx_comment_anchor_unavailable", "docx_comment_placeholder_body_unavailable",
+                                   "docx_comment_resolution_history_unavailable",
+                                   "docx_comment_body_content_unavailable", "docx_comment_thread_state_unavailable",
                                    "pptx_image_not_extracted", "pptx_chart_not_extracted",
                                    "pdf_page_without_text", "pdf_embedded_image_not_extracted",
                                    "pdf_form_xobject_not_inspected", "slide_without_text",

@@ -75,7 +75,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         run = workspace / "runs/packaged"
         manifest = json.loads((run / "manifest.json").read_text())
-        self.assertEqual(manifest["documents"]["adapter_version"], "0.6.2")
+        self.assertEqual(manifest["documents"]["adapter_version"], "0.7.0")
         evidence = (run / manifest["files"][0]["snapshot_path"]).read_text()
         self.assertIn("Still NOT approved", evidence)
         result = self.cli("check", "--run", str(run), "--inventory-only")
@@ -91,6 +91,23 @@ class PackagingTests(unittest.TestCase):
         result = self.cli("extract-document", "--source", str(source), "--out", str(snapshot))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("Hidden", (snapshot / "evidence.md").read_text())
+        result = self.cli("extract-document", "--verify", str(snapshot))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_docx_comment_worker_outside_checkout(self):
+        try:
+            from test_docx_comments import comment_docx
+        except ImportError:
+            from tests.test_docx_comments import comment_docx
+        source = self.root / "annotations.docx"
+        source.write_bytes(comment_docx(body=False))
+        snapshot = self.root / "docx-snapshot"
+        result = self.cli("extract-document", "--source", str(source), "--out", str(snapshot))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        evidence = (snapshot / "evidence.md").read_text()
+        self.assertIn("Reply text", evidence)
+        self.assertIn('"resolved_at": null', evidence)
+        self.assertIn('"date": "2026-09-01T12:30:00"', evidence)
         result = self.cli("extract-document", "--verify", str(snapshot))
         self.assertEqual(result.returncode, 0, result.stderr)
 

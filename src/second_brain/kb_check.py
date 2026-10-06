@@ -92,7 +92,7 @@ def load_manifest(run: Path) -> dict:
         if policy is not None and "adapter_version" not in m["documents"]:
             raise KBError("Document policy lacks its frozen adapter version")
         document_policy = m["documents"]
-        if document_policy["adapter_version"] in {"0.4.0", "0.5.0", "0.6.0", "0.6.1", "0.6.2"}:
+        if document_policy["adapter_version"] in {"0.4.0", "0.5.0", "0.6.0", "0.6.1", "0.6.2", "0.7.0"}:
             representation = document_policy.get("csv_representation")
             header = document_policy.get("csv_header")
             if representation not in {"raw", "structured"} or header not in {"none", "first-row"} \

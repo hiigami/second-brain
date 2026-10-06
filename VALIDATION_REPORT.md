@@ -2,7 +2,67 @@
 
 This report retains engine checks and synthetic validation results. Private project-run checks and findings are omitted.
 
-## Current macOS compatibility repair — engine 0.4.0, adapter 0.6.2
+## Current DOCX comment capture — engine 0.4.0, adapter 0.7.0
+
+Executed 2026-10-06 on Linux with synthetic DOCX packages. The user's requested
+architect review passed before implementation. Comments now provide citable
+paragraph/table/hyperlink text and recorded annotation metadata, including raw
+dates, validated reply-parent links and current per-comment resolved flags.
+Missing extended metadata stays unknown; `resolved_at` stays null. Modern
+follow-up bodies and unsupported prose wrappers/extensions remain explicit gaps.
+No new dependencies, schema/configuration versions or model/provider calls were
+introduced, and no real project evidence, approval or publication was modified.
+
+The first seven synthetic cases failed against the previous comment omission.
+The architect's implementation review then reproduced hidden inline-wrapper
+prose loss and flagged an overly strict timezone-suffix restriction on modern
+`dateUtc`. Two regressions failed before the narrow fixes: wrapped prose now gets
+an unavailable issue; a timezone-free modern date retains its spelling and the
+attribute's defined UTC semantics. An initial checker-version edit had an
+indentation error, corrected before the passing focused run. The end-to-end
+negative-quote assertion was corrected to expect the checker's `KBError`.
+
+| Command or check | Result |
+| --- | --- |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest tests.test_docx_comments tests.test_document_formats tests.test_document_integration tests.test_segments tests.test_packaging` | **159 run, 158 passed, 1 skipped** at the first implementation checkpoint (optional LibreOffice `.ppt`). |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest tests.test_docx_comments tests.test_document_integration.DocumentRunTests.test_comment_only_capture_packets_and_exact_segment_citations tests.test_document_integration.DocumentRunTests.test_historical_docx_without_comment_extraction_remains_frozen tests.test_packaging.PackagingTests.test_docx_comment_worker_outside_checkout` | **23 passed** after the review fixes. Includes exact metadata/reply citations and fabricated-quote rejection, comment-only capture/check/packets, unchanged frozen 0.6.2 DOCX artifacts, incomparable new captures, and packaged DOCX extraction/verification outside the checkout. |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest discover -s tests` | **451 run, 450 passed, 1 skipped** (optional LibreOffice legacy `.ppt`). |
+| Architect read-only implementation re-review | **PASS**; both review findings closed. Independently executed **20 comment tests**, all passed, and `git diff --check`. |
+| Initial independent deputy review | **PASS**, no blocking findings. Reviewed all changed/new source, tests, docs, ADR and validation evidence; independently confirmed `git diff --check`. Representative Word-export fidelity and native macOS execution remain disclosed limitations. |
+| `git diff --check` | PASS. |
+
+### Fresh independent review follow-up
+
+A fresh reviewer found a P2 disclosure gap: the no-linked-comments-part branch
+returned before inspecting surviving main-document comment markers. A bounded
+synthetic reproduction preserved the source body and markers, but produced no
+annotation-specific gap. The new regression failed in all eight subcases before
+the fix: each of the three marker kinds alone and all three together, with the
+comments part either absent or present but unlinked. The branch now emits
+`docx_comment_anchor_unavailable` at the main-document locator before returning
+its empty annotation plan. Ordinary comment-free behavior remains unchanged.
+This early-return orchestration defect is covered by the discrete marker/part
+matrix and the ordinary-document negative case; property-based follow-up is not
+required for this bounded correction.
+
+| Follow-up command or check | Result |
+| --- | --- |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest tests.test_docx_comments tests.test_document_formats tests.test_document_integration tests.test_segments tests.test_packaging` | **167 run, 166 passed, 1 skipped** (optional LibreOffice legacy `.ppt`). The full-suite row above records the earlier checkpoint; the follow-up ran these relevant modules. |
+| Fresh independent reviewer re-review | **PASS**; prior P2 closed, no new findings. Independently ran the new marker regression and ordinary comment-free test: **2 passed**, and `git diff --check`. No files changed during review. |
+| `git diff --check` after recording results | PASS. |
+
+Representative Word-export interoperability, visual fidelity and native macOS
+execution of this feature remain unverified. Synthetic regression success is
+not semantic validation or business approval. Exact resolution time/history,
+reactions, mention identities and deleted comments remain unavailable.
+
+README verification ledger: the new capability paragraph introduces no full
+command or runnable snippet; the existing `--documents` flag is exercised by the
+inventory integration tests and packaged CLI tests in the full suite. The edited
+visual-review sentence only removes a stale adapter-version reference; its
+existing command family and linked workflow are unchanged.
+
+## Historical macOS compatibility repair — engine 0.4.0, adapter 0.6.2
 
 Executed 2026-10-06 on Linux with synthetic inputs. The user-supplied macOS
 report ran 419 tests and recorded 22 errors from the `/var` symlink path guard,
