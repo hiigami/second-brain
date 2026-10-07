@@ -13,6 +13,13 @@ Human-reviewed reference set and expected critical facts/elements:
 Categories, formats, and declared support levels assessed:
 Agreed acceptance thresholds and who agreed them before evaluation:
 Baseline task/question and review effort for comparison:
+Targeted run purpose, selection/profile and context generation:
+Authorized cohort and predefined metric denominators:
+Uncertain attribution / unavailable evidence counts (separate):
+Attribution precision / recall; unrelated exposed characters / retained bytes:
+Retained-claim / material-conflict coverage; lost qualifiers / unsupported promotions:
+Context retrieval recall and predefined answer usefulness result:
+Scoped-export minutes / manual preparation / tool latency / model effort:
 
 | Measure | Result | Evidence / notes |
 | --- | --- | --- |

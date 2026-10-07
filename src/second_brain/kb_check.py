@@ -102,6 +102,10 @@ def load_manifest(run: Path) -> dict:
         elif ".csv" in document_policy["extensions"]:
             raise KBError("Historical document policy cannot capture structured CSV")
         scope["documents"] = m["documents"]
+    from .kb_targeting import load_targeted, selection_policy
+    targeted = load_targeted(run, m)
+    if targeted is not None:
+        scope["targeted_policy"] = selection_policy(targeted)
     if json_sha(scope) != m["scope_sha256"]:
         raise KBError("Scope fingerprint mismatch")
     ids, logicals, keys = set(), set(), set()
@@ -231,6 +235,9 @@ def load_manifest(run: Path) -> dict:
             raise KBError("Segment inventory disagrees with frozen evidence")
     elif "segment_inventory" in m:
         raise KBError("Historical manifest cannot declare a segment inventory")
+    if targeted is not None:
+        from .kb_context import check_context
+        check_context(run,m)
     return m
 
 
@@ -299,13 +306,15 @@ def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) 
     contract(data, "records")
     if data["project_id"] != m["project_id"] or data["run_id"] != m["run_id"]:
         raise KBError("Records belong to another project or run")
-    segment_bound = data["schema_version"] in {"0.3", "0.4", "0.5"}
+    if "targeted" in m and data["schema_version"] != "0.6":
+        raise KBError("Targeted profile requires records 0.6; older schemas cannot bypass routing or intervals")
+    segment_bound = data["schema_version"] in {"0.3", "0.4", "0.5", "0.6"}
     segment_data = load_segment_inventory(run, m) if segment_bound else None
     if segment_bound and segment_data is None:
         raise KBError("Records 0.3/0.4 require a frozen segment inventory")
     if not segment_bound and "segment_coverage" in data:
         raise KBError("Segment coverage requires records 0.3/0.4")
-    if data["schema_version"] in {"0.4", "0.5"}:
+    if data["schema_version"] in {"0.4", "0.5", "0.6"}:
         if any("events" not in r for r in data["records"]):
             raise KBError("Records 0.4 require an events array on every record")
     elif any("events" in r for r in data["records"]):
@@ -410,8 +419,26 @@ def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) 
         for sid, segment in segments.items():
             parent = coverage[segment["evidence_id"]]["disposition"]
             child = segment_coverage[sid]["disposition"]
-            if parent in {"triaged_out", "reviewed_no_record", "deferred"} and child != parent:
+            if data["schema_version"] != "0.6" and parent in {"triaged_out", "reviewed_no_record", "deferred"} and child != parent:
                 raise KBError(f"Segment coverage conflicts with its file disposition: {sid}")
+    interval_counts = {}
+    assertion_hints = []
+    if data["schema_version"] == "0.6":
+        from .kb_reconciliation import check_assertions
+        assertion_hints = check_assertions(m, data)
+        from .kb_intervals import check_intervals
+        interval_counts = check_intervals(run, m, data, segments, [e for r in records.values() for e in _citations(r)], stage2)
+        for r in records.values():
+            refs = [a["evidence_ref"] for a in r["attribution"]]
+            if sorted(refs) != list(range(len(_citations(r)))):
+                raise KBError("Every parent citation needs exactly one attribution assessment")
+            for a in r["attribution"]:
+                if a["class"] == "R2" or (a["class"] in {"unknown", "R3"} and r["epistemic_status"] == "observed"):
+                    raise KBError("Other-project-only or unknown attribution cannot become observed home knowledge")
+                if a["class"] == "home" and a["project_id"] != m["project_id"]:
+                    raise KBError("Home attribution must name this project")
+                if a["class"] in {"R1", "R4"} and not any(l["project_id"] == a["project_id"] for l in r["cross_project"]):
+                    raise KBError("R1/R4 attribution requires a freshly assessed cross-project link")
     if stage2 and not records:
         raise KBError("Stage 2 publication requires at least one record; an empty snapshot would also retire "
                       "every record of the current release")
@@ -424,8 +451,8 @@ def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) 
     # a quota gate rewards fabricating a category to pass.
     missing_kinds = sorted(set(RECORD_KIND_PREFIX) - {r["kind"] for r in records.values()})
     event_count, event_status, effective_status = (check_record_events(data["records"])
-                                                    if data["schema_version"] in {"0.4", "0.5"} else (0, {}, {}))
-    return {"record_count": len(records), "citation_count": citation_count,
+                                                    if data["schema_version"] in {"0.4", "0.5", "0.6"} else (0, {}, {}))
+    return {**interval_counts, "assertion_hints": assertion_hints, "record_count": len(records), "citation_count": citation_count,
             "event_count": event_count, "event_date_status_counts": event_status,
             "effective_date_status_counts": effective_status,
             "relation_count": relation_count, "coverage_count": len(coverage),
@@ -439,24 +466,26 @@ def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) 
             "semantic_hints": semantic_hints(m, data)}
 
 
-def check_run(run: Path, records_path: Path | None = None, stage2: bool = False, live: bool = False) -> dict:
+def check_run(run: Path, records_path: Path | None = None, stage2: bool = False, live: bool = False, historical: bool = False) -> dict:
     m = load_manifest(run)
     if m["status"] != "ready":
         raise KBError("Inventory is blocked; inspect manifest.issues and create a corrected new run")
+    from .kb_context import check_context
+    context_report = check_context(run,m, Path(m["targeted"]["config_path"]) if "targeted" in m and not historical else None)
     if live:
         verify_live(m)
     records_raw = read_stable(records_path, 16 * 1024 * 1024) if records_path is not None else None
     counts = check_records(run, m, records_path, stage2) if records_path is not None else {}
     if records_path is not None:
         records_data = read_json(records_path)
-        if records_data["schema_version"] == "0.5":
+        if records_data["schema_version"] in {"0.5", "0.6"}:
             from .kb_referrals_contract import check_referrals
             counts.update(check_referrals(run, m, records_data))
         if sha(read_stable(records_path, 16 * 1024 * 1024)) != sha(records_raw):
             raise KBError("Records changed during checking; retry on stable inputs")
     return {"status": "passed", "checked_at": utc_now(), "tool_version": TOOL_VERSION,
             "project_id": m["project_id"], "run_id": m["run_id"],
-            "file_count": len(m["files"]), "stage2_gate": stage2,
+            "file_count": len(m["files"]), "stage2_gate": stage2, **context_report,
             "live_existing_files_checked": live, **counts,
             "limitations": ["Checks establish integrity and structural consistency, not semantic truth or upstream authority.",
                             "Coverage dispositions are declarations requiring human review; triaged_out inputs were not read in full.",
@@ -471,12 +500,13 @@ def main() -> int:
     p.add_argument("--inventory-only", action="store_true")
     p.add_argument("--stage2", action="store_true")
     p.add_argument("--live", action="store_true")
+    p.add_argument("--historical", action="store_true", help="Frozen integrity only; never a prospective permission/publication check")
     p.add_argument("--report", type=Path)
     a = p.parse_args()
     if a.inventory_only and a.stage2:
         raise KBError("--inventory-only and --stage2 are mutually exclusive")
     path = None if a.inventory_only else (a.records or a.run / "proposals" / "records.json")
-    report = check_run(a.run, path, a.stage2, a.live)
+    report = check_run(a.run, path, a.stage2, a.live, a.historical)
     if a.report:
         write_json_new(a.report, report)
     print(json.dumps(report, indent=2, ensure_ascii=False))

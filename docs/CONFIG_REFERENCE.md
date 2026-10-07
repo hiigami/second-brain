@@ -15,6 +15,8 @@
 | `mentions` | `tools/kb_mentions.py` |
 | `referrals` | `tools/kb_referrals.py` |
 | `index` | `tools/kb_index.py` |
+| `context` | `tools/kb_context.py` |
+| `run` | `tools/kb_run.py` |
 | `extract-document` | `tools/kb_extract_document.py` |
 | `sync-skills` | `tools/kb_sync_skills.py` |
 | `reset-project` | `tools/kb_reset_project.py` |
@@ -218,3 +220,135 @@ Adapter 0.7.0 includes DOCX comment paragraphs, tables and hyperlink text, plus 
 `resolved_at` remains null: these supported DOCX parts carry no reliable resolution timestamp or audit history. Raw date strings retain their original timezone spelling. Timezone-free `date` has no inferred timezone; `date_utc` is UTC by the modern attribute's definition even without a suffix. Supported dates use a four-digit-year ISO date-time profile. Follow-up placeholder bodies, unsupported inline wrappers/extensions and missing/ambiguous anchors remain visible gaps. Extraction does not reconstruct targeted text, reactions, mention identities, deleted comments, visual layout or complete revision history. Malformed/ambiguous joins and structure/output budget exhaustion block capture. Historical 0.6.2 captures remain verifiable without regeneration, and a baseline across adapter versions is incomparable. Representative Word-export fidelity review is still pending; automated coverage is synthetic. See [ADR 007](architecture/adr/007-docx-comment-evidence.md).
 
 A Google Docs shortcut is not its document content. With or without `--documents`, a reviewed upstream export/conversion is the source of trustworthy document content. Changing a filename to `.txt` is not an acceptable fidelity strategy. Documents with significant tables, comments, suggestions, tabs, images, or attachments may require richer Stage 1 evidence before a Stage 2 answer is trustworthy.
+
+## Targeted run preparation
+
+This is opt-in; existing inventory and packet calls retain legacy behavior.
+`project.json` stays 0.1. Read ADRs [008](architecture/adr/008-targeted-run-scope-and-coverage.md)
+and [009](architecture/adr/009-project-assertions-and-pinned-context.md) and the
+machine-readable [run-request 1.0 schema](../src/second_brain/schemas/run-request.schema.json).
+These examples are conditional on operator-authorized inputs; placeholder paths
+are not permissions or configured projects.
+
+An operator request names `project_id`, `purpose` (`analysis_only` or
+`project_refresh`), `capture_mode`, `authorized_by`, `authorized_at` (timezone
+required), `permission_reason`, exact `selection`, `packets`, `registry_path` and
+`context`. Each selection names `source_id`, `relative_path`, nullable `sha256`
+and nullable `provenance`. Exact membership must be inside configured include/
+exclude scope. Preflight reports included paths, missing inputs and the exclusion
+rule without opening source content. Every other configured path is excluded
+before content reads; it does not enumerate the contents of excluded directories.
+
+`whole_file` explicitly permits all listed bytes, including unrelated passages.
+`scoped_export` permits only reviewed UTF-8 `.txt`/`.md` exports and requires their
+observed SHA-256 and provenance: `original_reference`, `locator`, `reviewed_by`,
+`reviewed_at`, `limitations`. Original references are audit text, never opened by
+capture. The operator prepares exports and verifies fidelity; the engine cannot
+infer permission from relevance. Observed hash/review metadata changes do not
+invalidate ordinary deltas; membership, representation mode, intent and packet
+policy/composition changes do.
+
+`packets` always declares `composition` (union/intersection), `globs`, `terms`,
+`ranges` and `max_chars` (at least 1,000). Empty selector arrays mean all explicitly
+captured members. Ranges name source/path and inclusive 1-based start/end lines.
+Union combines the supplied groups; intersection intersects them. Include
+headings, table labels and pending/proposed qualifiers as explicit context ranges.
+Omitted complements are exposed to semantic review; they are never called read.
+Packet budgets use Unicode characters, not model tokens. One oversized line or
+an empty resulting selection fails rather than widening/truncating input.
+
+`registry_path` names an operator-maintained registry 1.1 containing the home
+project, even with no aliases or disclosures. It grants no implicit disclosure.
+`context: null` explicitly opts out of index retrieval and supports first runs.
+Local prior citation suggestions remain subject to current-run revalidation.
+Requested context instead names `access_path`, `registry_path`,
+`project_configs` (exact authorized index set), `permission_path`, `queries`,
+`max_records` (1–1,000), `max_bytes` (1,000–16,000,000), `required_keys` and
+`expand_relations` (0–2). Missing/filtered required keys or required budget
+failures block; optional omissions are counted. Initial retrieval fully verifies
+the index and shares a generation across queries; ranking version 1 uses title,
+reviewed aliases, statements/questions/events and deterministic qualified-key ties.
+
+A separate [context-permission 1.0](../src/second_brain/schemas/context-permission.schema.json)
+must authorize selected source project ids and the exact target run/release paths,
+`copy_quotes`, `copy_briefing`, `retain_audit` (all true), operator/time and retention
+reason. Keep this permission outside its run/release. Index output permission or
+referral grants alone cannot permit these retained destinations. The bundle in
+`work/context.json` freezes exact qualified records, provenance/status, queries,
+budgets/omissions, permission and selected release/config/project-policy bindings.
+The briefing labels it untrusted prior knowledge, never current evidence.
+
+After the operator has prepared these inputs, the conditional commands are:
+
+```bash
+uv run --locked --no-sync second-brain run create \
+  --project /approved/project/config/project.json \
+  --request /approved/operator/run-request.json --run-id selected-001 --dry-run
+uv run --locked --no-sync second-brain run create \
+  --project /approved/project/config/project.json \
+  --request /approved/operator/run-request.json --run-id selected-001
+```
+
+The second command captures and prepares only explicitly selected evidence.
+Add `--baseline /approved/project/runs/previous-run` for a checked comparable
+capture baseline. `inventory --request FILE --dry-run` performs scope-only
+preflight; `inventory --request FILE` supports explicit no-context requests.
+Requested context uses `run create` so retrieval happens before capture.
+
+Preparation writes hash receipts in `work/preparation.json` for capture, packets,
+mentions, citation suggestions, briefing/checklist and inventory/context checking.
+It creates no candidate, semantic review, human approval or publication. Read
+`work/assistant-briefing.md`, then follow the existing manual workflow. New
+profiles require records 0.6/referrals 1.1 irrespective of alias hits. Interval
+coverage must partition each existing segment, including unread complements;
+review acknowledges triaged intervals through their containing segment ids.
+Every citation declares attribution in parent-then-finding order. Manual registered
+references supplement alias hits. Unknown attribution cannot be an observed home
+claim, and R2 cannot support home knowledge. Assertions cite parent evidence and
+qualified targets, retain semantic status/direction, and never update target claims.
+
+`run create ... --resume` accepts only completed verified stages with matching
+request, configuration/scope, registry, prior-release, baseline, selected-source
+and output hashes. The packet receipt must cover every indexed packet and exactly
+match the current packet file set; missing or unexpected outputs block resume.
+It never replaces frozen context or recaptures. Interrupted
+stages (including committed output without a receipt) require a new run id.
+Existing capture/packet exception paths remove their temporary outputs; crash
+leftovers and stale `.preparation.lock` require operator inspection. Never delete
+receipts or reseal evidence to force resume. A ready resume is read-only and
+preserves bytes. A continuing resume rechecks its validated receipt under the
+preparation lock before any stage write. If a competing caller completed it first,
+the delayed caller fails without changing that result; retry verified resume.
+Analysis-only runs cannot prepare publication review or publish
+through any entry point. Project refresh requires a complete checked snapshot and
+explicit human-reviewed removal ids, with unavailable retained support visible.
+
+`reanchor --citation-only` offers routed matches for records 0.5/0.6 and clears
+routing/assertions/aliases; attribution and disclosures need fresh assessment.
+Only matches entirely within the new run's selected passages are suggested.
+`outside_selected_passages` reports excluded support without copying that citation
+into the suggestion; dropped record ids still require revalidation or deliberate
+human-reviewed removal. Identical quotes in selected passages remain suggestions
+requiring semantic review.
+`index assertions` resolves project-owned assertion views against only the
+explicitly authorized index selection and displays cycles, opposing assertions,
+and unavailable/historical targets. It does not merge claims or infer active state.
+Only observed or interpretation assertions establish supersession cycles;
+proposal and unresolved assertions remain visible with their original status.
+`index query --expand-relations 0|1|2` returns ranking reasons, ties and omission
+counts while respecting project/kind/status/current-history filters.
+
+`context --run RUN --project CONFIG` and the default `check` path verify live
+selected permissions/dependencies. Selected foreign changes require a new run;
+unrelated index generations do not invalidate pinned selections. Prospective
+review/publication checks repeat freshness before the target pointer swap.
+`check --historical` and `context --run RUN` validate frozen integrity only: these
+cannot authorize new use, review or publication. Historical release validation
+is independent of later foreign pointers/grants. Retention after revocation stays
+an operator duty. Context permission fields are audit declarations, not identity
+or OS access controls, and release sets are not a cross-project transaction.
+
+After successful human publication, rebuild any derived index explicitly. An
+index refresh failure cannot roll back publication. Real capture permissions,
+retention, usefulness thresholds and the labeled pilot remain pending until
+operators and reviewers supply and assess them.

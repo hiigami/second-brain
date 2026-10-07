@@ -46,7 +46,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("Hello", result.stdout)
         for command in ("init", "inventory", "packet", "check", "reanchor", "publish",
-                        "mentions", "referrals", "index", "extract-document", "visual-review", "sync-skills", "reset-project"):
+                        "mentions", "referrals", "index", "context", "run", "extract-document", "visual-review", "sync-skills", "reset-project"):
             with self.subTest(command=command):
                 result = self.cli(command, "--help")
                 self.assertEqual(result.returncode, 0, result.stderr)

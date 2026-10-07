@@ -261,10 +261,22 @@ def inventory(config_path: Path, run_id: str, baseline: Path | None = None,
               max_files: int = 2000, documents: bool = False, allow_legacy_ppt: bool = False,
               soffice: str | None = None, document_timeout_seconds: int = 90,
               csv_encoding: str = "utf-8-sig", csv_delimiter: str = ",",
-              csv_representation: str = "raw", csv_header: str = "none") -> tuple[Path, dict]:
+              csv_representation: str = "raw", csv_header: str = "none",
+              request: dict | None = None, context_bundle: dict | None = None) -> tuple[Path, dict]:
     identifier(run_id, "run id")
     cfg, project, locations = load_project(config_path)
     source_scope, active_sources, source_roots = load_source_scope(cfg, project, locations)
+    selected_items = None
+    if request is not None:
+        from .kb_targeting import preflight, selection_policy
+        scope_report = preflight(config_path, request)
+        if scope_report["missing"]:
+            raise KBError(f"Selected inputs missing: {scope_report['missing']}")
+        if (request["context"] is None) != (context_bundle is None):
+            raise KBError("Requested context must be prepared explicitly before capture")
+        selected_items = {(i["source_id"], i["relative_path"]): i for i in request["selection"]}
+    elif context_bundle is not None:
+        raise KBError("Context capture requires a targeted request")
     if min(max_file_bytes, max_total_bytes, max_files) <= 0:
         raise KBError("All inventory limits must be positive")
     if document_timeout_seconds < 1:
@@ -323,6 +335,8 @@ def inventory(config_path: Path, run_id: str, baseline: Path | None = None,
              "tool_version": TOOL_VERSION, "capture_policy_version": capture_policy["version"]}
     if source_scope is not None:
         scope["source_scope"] = source_scope
+    if request is not None:
+        scope["targeted_policy"] = selection_policy(request)
     documents_policy = None
     if documents:
         # Document extraction settings join the frozen scope only when enabled.
@@ -350,6 +364,12 @@ def inventory(config_path: Path, run_id: str, baseline: Path | None = None,
                 "delta": {"baseline_run_id": None, "baseline_created_at": None, "baseline_sequence": None,
                           "compatible": None, "added": [], "modified": [], "removed": [], "unchanged": [],
                           "renamed": []}}
+    if request is not None:
+        manifest["targeted"] = {"version": "1.0", "config_path": str(config_path.resolve()), "request_path": "run-request.snapshot.json",
+                               "request_sha256": sha(json_bytes(request)),
+                               "policy_sha256": json_sha(selection_policy(request)),
+                               "purpose": request["purpose"],
+                               "context_sha256": sha(json_bytes(context_bundle)) if context_bundle is not None else None}
     if documents_policy is not None:
         # Recorded in the manifest so kb_check can rebuild the scope digest from
         # the frozen manifest alone; text-only runs omit the key entirely.
@@ -374,6 +394,11 @@ def inventory(config_path: Path, run_id: str, baseline: Path | None = None,
         write_json_new(tmp / "project.snapshot.json", cfg)
         if source_scope is not None:
             write_json_new(tmp / SOURCE_SCOPE_SNAPSHOT, source_scope)
+        if request is not None:
+            write_json_new(tmp / "run-request.snapshot.json", request)
+        if context_bundle is not None:
+            contract(context_bundle, "run-context")
+            write_json_new(tmp / "work/context.json", context_bundle)
         for source in sorted(active_sources, key=lambda s: s["id"]):
             sid = source["id"]
             root = source_roots[sid]
@@ -384,12 +409,21 @@ def inventory(config_path: Path, run_id: str, baseline: Path | None = None,
             if budget_exhausted:
                 issue("error", "scope_not_scanned_budget", sid, None, "Capture stopped at its budget; this source was not scanned")
                 continue
+            if selected_items is not None and not any(source_id == sid for source_id, _ in selected_items):
+                issue("warning", "unselected_source_scope", sid, None, "Source excluded by explicit targeted membership; not scanned")
+                continue
             if not root.is_dir():
                 issue("error", "source_unavailable", sid, None, "Source directory does not exist or is inaccessible")
                 continue
             def walk_error(exc: OSError) -> None:
                 issue("error", "directory_unreadable", sid, None, str(exc))
-            for directory, dirs, files in os.walk(root, topdown=True, followlinks=False, onerror=walk_error):
+            if selected_items is None:
+                walk = os.walk(root, topdown=True, followlinks=False, onerror=walk_error)
+            else:
+                # Only explicit members: excluded mixed originals are never opened or walked.
+                walk = [(str((root / rel).parent), [], [(root / rel).name])
+                        for source_id, rel in sorted(selected_items) if source_id == sid]
+            for directory, dirs, files in walk:
                 if budget_exhausted:
                     break
                 base = Path(directory)
@@ -420,6 +454,10 @@ def inventory(config_path: Path, run_id: str, baseline: Path | None = None,
                         if len(manifest["files"]) >= max_files:
                             raise CaptureBudgetReached("Maximum file count reached; narrow the source scope")
                         data = read_stable(p, max_file_bytes)
+                        if selected_items is not None:
+                            expected_hash = selected_items[(sid, rel)]["sha256"]
+                            if expected_hash is not None and sha(data) != expected_hash:
+                                raise KBError("Selected bytes differ from authorized export hash")
                         if total + len(data) > max_total_bytes:
                             raise CaptureBudgetReached("Maximum total byte budget reached; narrow the source scope")
                         if suffix in LEGACY_DOCUMENT_EXTENSIONS and not allow_legacy_ppt:
@@ -558,7 +596,7 @@ def inventory(config_path: Path, run_id: str, baseline: Path | None = None,
         (tmp / "proposals").mkdir()
         (tmp / "packets").mkdir()
         # Assistant helper scripts and intermediate outputs; copied into releases as audit material.
-        (tmp / "work").mkdir()
+        (tmp / "work").mkdir(exist_ok=True)
         if run.exists():
             raise KBError(f"Run was created concurrently; refusing replacement: {run}")
         tmp.rename(run)
@@ -571,6 +609,8 @@ def inventory(config_path: Path, run_id: str, baseline: Path | None = None,
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--project", type=Path, required=True, help="<project-root>/config/project.json")
+    p.add_argument("--request", type=Path, help="Explicit run-request 1.0; context requests use run create")
+    p.add_argument("--dry-run", action="store_true", help="With --request: scope preflight without source reads")
     p.add_argument("--run-id", default=None)
     p.add_argument("--baseline", type=Path, help="Previous ready run directory")
     p.add_argument("--max-file-bytes", type=int, default=2_000_000)
@@ -593,12 +633,19 @@ def main() -> int:
     p.add_argument("--csv-header", choices=("none", "first-row"), default="none",
                    help="With structured CSV: declare the first record as column labels; never inferred")
     a = p.parse_args()
+    request = read_json(a.request) if a.request else None
+    if a.dry_run:
+        if request is None:
+            raise KBError("Dry-run requires an explicit run request")
+        from .kb_targeting import preflight
+        print(json.dumps(preflight(a.project, request), indent=2))
+        return 0
     run_id = a.run_id or "run-" + utc_now().replace("-", "").replace(":", "").replace("+0000", "z").lower() + "-" + uuid.uuid4().hex[:6]
     run, m = inventory(a.project, run_id, a.baseline, a.max_file_bytes, a.max_total_bytes, a.max_files,
                        documents=a.documents, allow_legacy_ppt=a.allow_legacy_ppt, soffice=a.soffice,
                        document_timeout_seconds=a.document_timeout,
                        csv_encoding=a.csv_encoding, csv_delimiter=a.csv_delimiter,
-                       csv_representation=a.csv_representation, csv_header=a.csv_header)
+                       csv_representation=a.csv_representation, csv_header=a.csv_header, request=request)
     documents_count = sum(1 for f in m["files"] if "document" in f)
     print(f"{m['status'].upper()}: {run}\nCaptured {len(m['files'])} files "
           f"({documents_count} documents); {len(m['issues'])} reported issues.")

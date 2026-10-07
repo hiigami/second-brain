@@ -1,6 +1,39 @@
 # Stage 2 contracts
 
-Versions: `project.json` 0.1 (frozen), optional source scope 1.0, project registry 1.1 (1.0 readable), manifest 0.1 (additively extended), segment inventory 1.0, records 0.5 (0.1–0.4 readable), review 0.4 for routed runs (0.1–0.3 readable), referral intake/review/link 1.0, index access/global index 1.0. Engine version 0.4.0.
+## Targeted preparation contracts (opt-in)
+
+See [ADR 008](docs/architecture/adr/008-targeted-run-scope-and-coverage.md) and
+[ADR 009](docs/architecture/adr/009-project-assertions-and-pinned-context.md).
+`project.json` remains 0.1. Additive `manifest.targeted` 1.0 binds a frozen
+`run-request` 1.0, stable policy digest, run purpose and optional context digest.
+Legacy manifests retain their original semantics. New targeted profiles require
+records 0.6 and referrals 1.1; exact legacy schemas retain records 0.5/referrals 1.0.
+Records 0.6 add interval coverage, per-citation attribution, aliases and qualified
+project-owned assertions. No newer schema may bypass the existing citation,
+segment, event, routing, human review or publication gates.
+
+Interval rows partition each frozen segment, in order, without gaps or overlaps.
+They bind representation hashes; rollups use used > deferred > triaged_out >
+reviewed_no_record. Every citation is covered by used intervals and every used
+interval intersects a citation. Unselected intervals cannot claim reading.
+Deferred intervals block Stage 2. Coverage does not certify semantic reading.
+Referral quotes must remain entirely within selected passages and cannot overlap
+triaged or deferred intervals; whole-file/segment rollups do not override this.
+
+`analysis_only` cannot prepare publication review or publish, including through
+direct entry points. `project_refresh` is a complete snapshot: all retained claims
+need current evidence and removed ids need explicit human acknowledgement.
+Whole-file authorization expressly includes unrelated bytes; strict isolation
+consumes hashed reviewed UTF-8 exports and never reads their original references.
+
+`context-permission` 1.0 covers run and eventual release destinations, quotes,
+briefings and retained audit copies. `run-context` 1.0 freezes prior qualified
+records and provenance, queries/ranking version, budgets/omissions and selected
+dependencies. Prospective checks use live permission/freshness; historical checks
+use frozen integrity only. Context is untrusted prior knowledge, never new-run
+evidence. Preparation receipts permit only verified completed-stage resume.
+
+Versions: `project.json` 0.1 (frozen), optional source scope 1.0, project registry 1.1 (1.0 readable), manifest 0.1 (additively extended), segment inventory 1.0, records 0.6 (0.1–0.5 readable), review 0.4 for routed runs (0.1–0.3 readable), referrals 1.1 (1.0 readable), referral intake/review/link 1.0, index access/global index 1.0. Engine version 0.4.0. Targeted run-request, context-permission and run-context are 1.0 opt-in contracts.
 
 The machine-readable contracts are `src/second_brain/schemas/*.schema.json`; superseded versions whose required fields changed are kept in `src/second_brain/schemas/legacy/<name>-<version>.schema.json` and selected by the document's `schema_version`. The tools validate a fixed subset of JSON Schema keywords and **reject any other keyword**, so a schema edit can never be silently ignored. They then enforce cross-file invariants. These scripts are not a general-purpose JSON Schema implementation. External Draft 2020-12 validators can also consume the schemas.
 

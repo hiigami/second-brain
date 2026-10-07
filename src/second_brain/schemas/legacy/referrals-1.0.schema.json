@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "schema_version": {
-      "const": "1.1"
+      "const": "1.0"
     },
     "project_id": {
       "type": "string",
@@ -199,66 +199,6 @@
         ],
         "additionalProperties": false
       }
-    },
-    "manual_mentions": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "target_project_id": {
-            "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
-          },
-          "source": {
-            "type": "object",
-            "properties": {
-              "evidence_id": {
-                "type": "string",
-                "pattern": "^E-[a-f0-9]{24}$"
-              },
-              "segment_id": {
-                "type": "string",
-                "pattern": "^S-[a-f0-9]{24}$"
-              },
-              "representation_sha256": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "start_line": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "end_line": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "quote": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "required": [
-              "evidence_id",
-              "segment_id",
-              "representation_sha256",
-              "start_line",
-              "end_line",
-              "quote"
-            ],
-            "additionalProperties": false
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "target_project_id",
-          "source",
-          "reason"
-        ],
-        "additionalProperties": false
-      }
     }
   },
   "required": [
@@ -268,8 +208,7 @@
     "registry_sha256",
     "mentions_sha256",
     "assessments",
-    "referrals",
-    "manual_mentions"
+    "referrals"
   ],
   "additionalProperties": false
 }

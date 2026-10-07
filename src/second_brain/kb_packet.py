@@ -6,14 +6,17 @@ import shutil
 import uuid
 from pathlib import Path
 
-from .kb_common import (KBError, content_sort_key, inside, matches, no_symlinks, read_stable, run_cli,
+from .kb_common import (KBError, content_sort_key, inside, matches, no_symlinks, read_json, read_stable, run_cli,
                        validate_pattern, write_json_new, write_new)
 from .kb_check import load_manifest, load_segment_inventory
 
 
 def select_evidence(run: Path, m: dict, selected: list[str] | None = None,
-                    globs: list[str] | None = None, terms: list[str] | None = None) -> tuple[set[str], str | None]:
-    """Union of explicit ids, path globs, and case-insensitive keyword hits; method label for triage."""
+                    globs: list[str] | None = None, terms: list[str] | None = None, composition: str = "union") -> tuple[set[str], str | None]:
+    """Compose supplied selector groups explicitly; preserve legacy union triage labels."""
+    if composition not in {"union", "intersection"}:
+        raise KBError("Selection composition must be union or intersection")
+    groups = []
     known = {f["evidence_id"] for f in m["files"]}
     if selected is None and not globs and not terms:
         return known, None
@@ -21,24 +24,27 @@ def select_evidence(run: Path, m: dict, selected: list[str] | None = None,
     if selected is not None:
         if not set(selected).issubset(known):
             raise KBError("Selection contains unknown evidence ids")
-        chosen |= set(selected)
+        groups.append(set(selected))
         method.append(f"evidence_id_selection:{len(set(selected))}")
     if globs:
         for g in globs:
             validate_pattern(g)
-        chosen |= {f["evidence_id"] for f in m["files"]
-                   if any(matches(f["relative_path"], g) or matches(f"{f['source_id']}/{f['relative_path']}", g) for g in globs)}
+        groups.append({f["evidence_id"] for f in m["files"]
+                   if any(matches(f["relative_path"], g) or matches(f"{f['source_id']}/{f['relative_path']}", g) for g in globs)})
         method.append("path_out_of_question_scope:" + ",".join(globs))
     if terms:
         folded = [t.casefold() for t in terms if t.strip()]
         if not folded:
             raise KBError("--grep terms must be nonempty")
+        hits = set()
         for f in m["files"]:
             text = read_stable(inside(run, f["snapshot_path"]), m["limits"]["max_file_bytes"]).decode("utf-8-sig").casefold()
             if any(t in text for t in folded):
-                chosen.add(f["evidence_id"])
+                hits.add(f["evidence_id"])
+        groups.append(hits)
         method.append("keyword_scan:" + ",".join(terms))
-    return chosen, "; ".join(method)
+    chosen = set.union(*groups) if composition == "union" else set.intersection(*groups)
+    return chosen, ("intersection; " if composition == "intersection" else "") + "; ".join(method)
 
 
 def coverage_stub(m: dict, chosen: set[str], method: str, segment_data: dict | None = None) -> dict:
@@ -106,7 +112,8 @@ def document_navigation(index: dict, m: dict) -> bytes:
 
 
 def build_packets(run: Path, max_chars: int = 16000, selected: list[str] | None = None,
-                  globs: list[str] | None = None, terms: list[str] | None = None) -> dict:
+                  globs: list[str] | None = None, terms: list[str] | None = None, composition: str = "union",
+                  segment_ids: list[str] | None = None, ranges: list[dict] | None = None) -> dict:
     m = load_manifest(run)
     if m["status"] != "ready":
         raise KBError("Cannot build packets from a blocked inventory")
@@ -117,7 +124,46 @@ def build_packets(run: Path, max_chars: int = 16000, selected: list[str] | None 
     by_evidence = {}
     for segment in (segment_data or {}).get("segments", []):
         by_evidence.setdefault(segment["evidence_id"], []).append(segment)
-    chosen, method = select_evidence(run, m, selected, globs, terms)
+    from .kb_targeting import load_targeted
+    from .kb_intervals import selected_ranges, merge_ranges, interval_stub, rollup
+    request = load_targeted(run, m)
+    if request is not None:
+        if selected is not None or globs or terms or segment_ids is not None or ranges is not None or composition != "union":
+            raise KBError("Targeted packet policy is frozen; change the request in a new run")
+        if max_chars != 16000 and max_chars != request["packets"]["max_chars"]:
+            raise KBError("Targeted packet budget is frozen")
+        max_chars = request["packets"]["max_chars"]
+        selected_spans, method = selected_ranges(run, m, request)
+        chosen = set(selected_spans)
+    else:
+        chosen, method = select_evidence(run, m, selected, globs, terms, composition)
+        selected_spans = {f["evidence_id"]: [(1, f["line_count"])] for f in m["files"] if f["evidence_id"] in chosen and f["line_count"]}
+        if segment_ids is not None or ranges is not None:
+            if segment_data is None:
+                raise KBError("Passage selection requires frozen segments; historical segments are never invented")
+            explicit = {}
+            known_segments = {s["segment_id"]: s for s in (segment_data or {}).get("segments", [])}
+            for sid in segment_ids or []:
+                if sid not in known_segments:
+                    raise KBError("Unknown selected segment")
+                seg = known_segments[sid]
+                explicit.setdefault(seg["evidence_id"], []).append((seg["line_start"], seg["line_end"]))
+            for span in ranges or []:
+                eid, start, end = span["evidence_id"], span["start_line"], span["end_line"]
+                file = next((f for f in m["files"] if f["evidence_id"] == eid), None)
+                if file is None or not 1 <= start <= end <= file["line_count"]:
+                    raise KBError("Invalid selected line range")
+                explicit.setdefault(eid, []).append((start, end))
+            if selected is None and not globs and not terms:
+                selected_spans = explicit
+            elif composition == "intersection":
+                selected_spans = {eid: spans for eid, spans in explicit.items() if eid in chosen}
+            else:
+                for eid, spans in explicit.items():
+                    selected_spans.setdefault(eid, []).extend(spans)
+            selected_spans = {eid: merge_ranges(spans) for eid, spans in selected_spans.items()}
+            chosen = set(selected_spans)
+            method = (method or composition) + "; explicit_segments_and_ranges"
     if not chosen:
         raise KBError("Selection is empty")
     target = run / "packets"
@@ -129,7 +175,9 @@ def build_packets(run: Path, max_chars: int = 16000, selected: list[str] | None 
     index = {"schema_version": "0.1", "project_id": m["project_id"], "run_id": m["run_id"],
              "budget_unit": "unicode_characters_not_tokens", "max_chars": max_chars,
              "selected_evidence_ids": sorted(chosen), "unselected_evidence_ids": sorted(known - chosen),
-             "selection_method": method, "packets": []}
+             "selection_method": method, "packets": [],
+             "selected_intervals": {eid: [[a,b] for a,b in spans] for eid,spans in selected_spans.items()},
+             "context_omissions": "Unselected complements may contain governing headings, labels or status qualifiers; include explicit context ranges and review before claiming support."}
     if segment_data is not None:
         index["segments"] = [{"segment_id": s["segment_id"], "evidence_id": s["evidence_id"],
                               "original_locator": s["original_locator"], "line_start": s["line_start"],
@@ -175,7 +223,16 @@ def build_packets(run: Path, max_chars: int = 16000, selected: list[str] | None 
                                           **({"segment_ids": [s["segment_id"] for s in by_evidence.get(eid, [])
                                                               if s["line_start"] <= end and s["line_end"] >= start]}
                                              if segment_data is not None else {})})
+            last_number = 0
             for number, line in enumerate(lines, 1):
+                if not any(a <= number <= b for a,b in selected_spans.get(eid, [])):
+                    if group:
+                        flush(last_number)
+                        group, group_chars = [], len(header) + len(footer)
+                    continue
+                if not group:
+                    start = number
+                last_number = number
                 rendered = f"L{number:06d} | {line}\n"
                 if len(header) + len(footer) + len(rendered) > max_chars:
                     raise KBError(f"One line exceeds the packet budget: {eid}:{number}. Increase budget explicitly or prepare a reviewed structured excerpt; never truncate silently")
@@ -185,12 +242,25 @@ def build_packets(run: Path, max_chars: int = 16000, selected: list[str] | None 
                 group.append(rendered)
                 group_chars += len(rendered)
             if group:
-                flush(len(lines))
+                flush(last_number)
         navigation = document_navigation(index, m)
         write_new(temp / "document-navigation.md", navigation)
         write_json_new(temp / "index.json", index)
         if method is not None:
-            write_json_new(temp / "coverage-stub.json", coverage_stub(m, chosen, method, segment_data))
+            stub = coverage_stub(m, chosen, method, segment_data)
+            if request is not None or segment_ids is not None or ranges is not None:
+                stub["schema_version"] = "0.6"
+                stub["interval_coverage"] = interval_stub(segment_data, selected_spans, method)
+                for c in stub["segment_coverage"]:
+                    c["disposition"] = rollup(r["disposition"] for r in stub["interval_coverage"] if r["segment_id"] == c["segment_id"])
+                    if c["disposition"] == "triaged_out":
+                        c["method"] = method
+                for c in stub["coverage"]:
+                    children = {s["segment_id"] for s in segment_data["segments"] if s["evidence_id"] == c["evidence_id"]}
+                    c["disposition"] = rollup(r["disposition"] for r in stub["segment_coverage"] if r["segment_id"] in children)
+                    if c["disposition"] == "triaged_out":
+                        c["method"] = method
+            write_json_new(temp / "coverage-stub.json", stub)
         if target.exists():
             target.rmdir()
         temp.rename(target)
@@ -208,8 +278,12 @@ def main() -> int:
     p.add_argument("--select-glob", nargs="+", metavar="GLOB",
                    help="Select files whose relative path (or source_id/relative path) matches a glob")
     p.add_argument("--grep", nargs="+", metavar="TERM", help="Select files containing any term (case-insensitive)")
+    p.add_argument("--composition", choices=("union", "intersection"), default="union")
+    p.add_argument("--segments", nargs="+", help="Whole frozen segment ids")
+    p.add_argument("--ranges", type=Path, help="JSON array of evidence_id/start_line/end_line ranges")
     a = p.parse_args()
-    index = build_packets(a.run, a.max_chars, a.select, a.select_glob, a.grep)
+    index = build_packets(a.run, a.max_chars, a.select, a.select_glob, a.grep, a.composition, a.segments,
+                          read_json(a.ranges) if a.ranges else None)
     print(f"Created {len(index['packets'])} packets for {len(index['selected_evidence_ids'])} of "
           f"{len(index['selected_evidence_ids']) + len(index['unselected_evidence_ids'])} inputs. "
           f"Index: {a.run / 'packets/index.json'}")

@@ -1,0 +1,277 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "purpose": {
+      "enum": [
+        "analysis_only",
+        "project_refresh"
+      ]
+    },
+    "capture_mode": {
+      "enum": [
+        "whole_file",
+        "scoped_export"
+      ]
+    },
+    "authorized_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorized_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "permission_reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selection": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+          },
+          "relative_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "original_reference": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "locator": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reviewed_by": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reviewed_at": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "limitations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "required": [
+                  "original_reference",
+                  "locator",
+                  "reviewed_by",
+                  "reviewed_at",
+                  "limitations"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "source_id",
+          "relative_path",
+          "sha256",
+          "provenance"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "packets": {
+      "type": "object",
+      "properties": {
+        "composition": {
+          "enum": [
+            "union",
+            "intersection"
+          ]
+        },
+        "globs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "terms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+              },
+              "relative_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "start_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "end_line": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "source_id",
+              "relative_path",
+              "start_line",
+              "end_line"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 1000
+        }
+      },
+      "required": [
+        "composition",
+        "globs",
+        "terms",
+        "ranges",
+        "max_chars"
+      ],
+      "additionalProperties": false
+    },
+    "registry_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "access_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "registry_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "project_configs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            },
+            "permission_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "queries": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            },
+            "max_records": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "max_bytes": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 16000000
+            },
+            "required_keys": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "expand_relations": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            }
+          },
+          "required": [
+            "access_path",
+            "registry_path",
+            "project_configs",
+            "permission_path",
+            "queries",
+            "max_records",
+            "max_bytes",
+            "required_keys",
+            "expand_relations"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "purpose",
+    "capture_mode",
+    "authorized_by",
+    "authorized_at",
+    "permission_reason",
+    "selection",
+    "packets",
+    "registry_path",
+    "context"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "run-request"
+}

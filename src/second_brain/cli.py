@@ -15,6 +15,8 @@ COMMANDS = {
     "mentions": "kb_mentions",
     "referrals": "kb_referrals",
     "index": "kb_index",
+    "context": "kb_context",
+    "run": "kb_run",
     "extract-document": "kb_extract_document",
     "visual-review": "kb_visual_review",
     "sync-skills": "kb_sync_skills",

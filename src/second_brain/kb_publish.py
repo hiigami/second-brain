@@ -9,6 +9,8 @@ import shutil
 import uuid
 from pathlib import Path
 
+from .kb_targeting import publication_eligible
+
 from .kb_common import (KBError, atomic_json, check_timestamp, contract, identifier, inside,
                        json_sha, load_project, no_symlinks, read_json, read_stable, relative,
                        run_cli, sha, utc_now, warning_summary, write_json_new, write_new,
@@ -74,6 +76,7 @@ def current_release_records(approved: Path, project_id: str) -> tuple[str | None
 def prepare_review(config: Path, run: Path) -> dict:
     cfg, _, locations = load_project(config)
     m = load_manifest(run)
+    publication_eligible(m)
     records_path = run / "proposals" / "records.json"
     check = check_run(run, records_path, stage2=True)
     validate_location(cfg, locations, m, run)
@@ -82,14 +85,14 @@ def prepare_review(config: Path, run: Path) -> dict:
     prior = None
     if previous_data is not None:
         prior_root = inside(locations["approved"], previous_id)
-        check_run(prior_root, prior_root / "records.json", stage2=True)
+        check_run(prior_root, prior_root / "records.json", stage2=True, historical=True)
         prior = (prior_root, previous_data, read_json(prior_root / "manifest.json"))
     records = read_json(records_path)
     ids = {r["id"] for r in records["records"]}
     manifest_hash = sha(read_stable(run / "manifest.json", 16 * 1024 * 1024))
     records_hash = sha(read_stable(records_path, 16 * 1024 * 1024))
     work_hash = work_digest(read_work(run))
-    routing = records["schema_version"] == "0.5"
+    routing = records["schema_version"] in {"0.5", "0.6"}
     referrals_raw = read_stable(inside(run, "proposals/referrals.json"), 16 * 1024 * 1024) if routing else None
     mentions_raw = read_stable(inside(run, "work/mentions.json"), 16 * 1024 * 1024) if routing else None
     registry_digest = json_sha(read_json(inside(run, "work/registry.snapshot.json"))) if routing else None
@@ -133,8 +136,9 @@ def triaged_ids(records: dict) -> list[str]:
 
 
 def triaged_segment_ids(records: dict) -> list[str]:
-    return sorted(c["segment_id"] for c in records.get("segment_coverage", [])
-                  if c["disposition"] == "triaged_out")
+    return sorted({c["segment_id"] for c in [*records.get("segment_coverage", []),
+                                            *records.get("interval_coverage", [])]
+                   if c["disposition"] == "triaged_out"})
 
 
 def validate_location(cfg: dict, locations: dict, m: dict, run: Path) -> None:
@@ -173,9 +177,9 @@ def render_views(release: Path, records: dict, m: dict, previous: tuple[dict, di
              "[Project map](project-map.md)", "[Open questions](open-questions.md)", "[By code](by-code.md)"]
     if (release / "review-report.md").is_file():
         links.append("[Review report](review-report.md)")
-    if records["schema_version"] in {"0.4", "0.5"}:
+    if records["schema_version"] in {"0.4", "0.5", "0.6"}:
         links.append("[Timeline](timeline.md)")
-    if records["schema_version"] == "0.5":
+    if records["schema_version"] in {"0.5", "0.6"}:
         links.append("[Pending referral outbox](outbox.md)")
     if previous is not None:
         links.append(f"[Changes since {md(previous[0]['run_id'])}](changes-since-{previous[0]['run_id']}.md)")
@@ -203,7 +207,7 @@ def render_views(release: Path, records: dict, m: dict, previous: tuple[dict, di
             body.append("")
         for ev in r["evidence"]:
             show_evidence(ev)
-        if records["schema_version"] in {"0.4", "0.5"} and r["events"]:
+        if records["schema_version"] in {"0.4", "0.5", "0.6"} and r["events"]:
             body += ["## Events", ""]
             for event in r["events"]:
                 body += [f"### {event['id']}", "", md(event["statement"]), "",
@@ -238,7 +242,7 @@ def render_views(release: Path, records: dict, m: dict, previous: tuple[dict, di
     write_new(release / "project-map.md", ("# Project map\n\nDerived from records.json; edit records and regenerate, not this view.\n\n```mermaid\n" + "\n".join(graph) + "\n```\n").encode("utf-8"))
     write_new(release / "open-questions.md", open_questions_view(ordered, m))
     write_new(release / "by-code.md", by_code_view(ordered, m))
-    if records["schema_version"] in {"0.4", "0.5"}:
+    if records["schema_version"] in {"0.4", "0.5", "0.6"}:
         write_new(release / "timeline.md", timeline_view(records, m))
     if previous is not None:
         write_new(release / f"changes-since-{previous[0]['run_id']}.md", changes_view(records, m, *previous))
@@ -431,11 +435,12 @@ def publish(config: Path, run: Path, review_path: Path, human_approved: bool = F
         raise KBError("Publication requires explicit --human-approved after a real human review")
     cfg, _, locations = load_project(config)
     m = load_manifest(run)
+    publication_eligible(m)
     records_path = run / "proposals" / "records.json"
     report = check_run(run, records_path, stage2=True)
     validate_location(cfg, locations, m, run)
     records_raw = read_stable(records_path, 16 * 1024 * 1024)
-    routing = read_json(records_path)["schema_version"] == "0.5"
+    routing = read_json(records_path)["schema_version"] in {"0.5", "0.6"}
     referrals_path = inside(run, "proposals/referrals.json") if routing else None
     referrals_raw = read_stable(referrals_path, 16 * 1024 * 1024) if routing else None
     no_symlinks(review_path)
@@ -507,7 +512,7 @@ def publish(config: Path, run: Path, review_path: Path, human_approved: bool = F
         prior_context = None
         if prior is not None:
             prior_root = inside(approved, current_id)
-            check_run(prior_root, prior_root / "records.json", stage2=True)
+            check_run(prior_root, prior_root / "records.json", stage2=True, historical=True)
             prior_context = (prior_root, prior, read_json(prior_root / "manifest.json"))
         if routing:
             check_run(run, records_path, stage2=True)
@@ -528,6 +533,8 @@ def publish(config: Path, run: Path, review_path: Path, human_approved: bool = F
         write_new(tmp / "manifest.json", manifest_raw)
         write_new(tmp / "manifest.sha256", (sha(manifest_raw) + "\n").encode())
         write_new(tmp / "project.snapshot.json", read_stable(run / "project.snapshot.json", 16 * 1024 * 1024))
+        if "targeted" in m:
+            write_new(tmp / "run-request.snapshot.json", read_stable(run / "run-request.snapshot.json", 16 * 1024 * 1024))
         if "source_scope" in m:
             scope_path = m["source_scope"]["path"]
             write_new(tmp / scope_path, read_stable(inside(run, scope_path), 16 * 1024 * 1024))
@@ -554,7 +561,7 @@ def publish(config: Path, run: Path, review_path: Path, human_approved: bool = F
         # The exact bytes hashed above are written, so the release carries the reviewed audit trail.
         for rel, data in work:
             write_new(inside(tmp, rel), data)
-        check_run(tmp, tmp / "records.json", stage2=True)
+        check_run(tmp, tmp / "records.json", stage2=True, historical=True)
         write_json_new(tmp / "validation.json", report)
         if routing:
             outbox_bytes = render_outbox(m, read_json(tmp / "referrals.json"))
@@ -571,6 +578,8 @@ def publish(config: Path, run: Path, review_path: Path, human_approved: bool = F
                 or work_digest(read_work(run)) != review["work_sha256"] \
                 or (routing and sha(read_stable(referrals_path, 16 * 1024 * 1024)) != sha(referrals_raw)):
             raise KBError("Records/review/report/work changed during publication; retry after stabilizing files")
+        from .kb_context import check_context
+        check_context(run,m,config)
         tmp.rename(destination)
         history = approved / "HISTORY.jsonl"
         entry = {"published_at": utc_now(), "run_id": m["run_id"], "sequence": m.get("sequence"),

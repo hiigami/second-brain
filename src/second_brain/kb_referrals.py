@@ -178,7 +178,7 @@ def _approved_release(config: Path, run_id: str | None = None) -> dict | None:
     if not any(isinstance(entry, dict) and entry.get("run_id") == run_id for entry in published):
         raise KBError("Release is absent from the publication history")
     release = inside(locations["approved"], run_id)
-    check_run(release, inside(release, "records.json"), stage2=True)
+    check_run(release, inside(release, "records.json"), stage2=True, historical=True)
     manifest = load_manifest(release)
     records = read_json(inside(release, "records.json"))
     review = read_json(inside(release, "review.json"))
@@ -204,7 +204,7 @@ def _approved_release(config: Path, run_id: str | None = None) -> dict | None:
             or (triaged_segment_ids(records) and not review["segment_triage_acknowledged"]):
         raise KBError("Approved release audit or review gate changed")
     referrals = []
-    if records["schema_version"] == "0.5":
+    if records["schema_version"] in {"0.5", "0.6"}:
         if review["schema_version"] != "0.4":
             raise KBError("Routed release lacks routing approval")
         for filename, key in (("referrals.json", "referrals_sha256"),
@@ -219,7 +219,7 @@ def _approved_release(config: Path, run_id: str | None = None) -> dict | None:
             raise KBError("Approved outbox changed")
         referrals = routing["referrals"]
     bound_files = ["manifest.json", "records.json", "review.json", "review-report.md"]
-    if referrals or records["schema_version"] == "0.5":
+    if referrals or records["schema_version"] in {"0.5", "0.6"}:
         bound_files += ["referrals.json", "outbox.md"]
     segments = load_segment_inventory(release, manifest)
     result = {"project_id": project_id, "run_id": run_id, "release": release,
@@ -247,7 +247,7 @@ def _stable_pointer(origin: dict) -> None:
            for file, digest in origin["bindings"].items()) \
             or work_digest(read_work(origin["release"])) != origin["work_sha256"]:
         raise KBError("Approved release changed during intake; retry")
-    check_run(origin["release"], inside(origin["release"], "records.json"), stage2=True)
+    check_run(origin["release"], inside(origin["release"], "records.json"), stage2=True, historical=True)
 
 
 def load_approved_release(config: Path, run_id: str | None = None) -> dict | None:

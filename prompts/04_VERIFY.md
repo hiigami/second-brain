@@ -2,6 +2,16 @@
 
 Read the candidate, current-run evidence in context, project policy, and checker output. Re-examine high-risk claims rather than merely rewriting them. A second pass by the same model is not an independent judge.
 
+For targeted records 0.6, inspect every interval complement and qualifier omission,
+per-citation attribution, manual reference and fresh referral assessment. Empty
+alias scans do not establish complete attribution. Inspect the complete-snapshot
+reconciliation report and all qualified assertions, their direction/status and
+unavailable targets; cyclic/opposing supersession remains visible, never resolved
+by ingestion order. Challenge retained claims with lost support and deliberate
+removals. Ranked prior context is not current-run evidence. Prospective context
+permission/freshness checks must pass before use and human review preparation;
+historical frozen-integrity checking does not authorize new use or publication.
+
 Check support/entailment, source-status handling, conflicts, omissions, direction of relations, investigation scope, and whether any coverage entry overstates what was read (reviewed_no_record must mean read in full; triage belongs in triaged_out with its method). Go through every semantic_hints entry in the checker report: single-line citations, pending language in decision quotes, and decisions resting only on AI-generated summaries. A matching quote can still be irrelevant or misleading. Do not infer business approval from the local record's existence.
 
 For records 0.4, compare each event statement, event date, effective date, precision, conflict alternative, and relative anchor with the exact cited lines and surrounding context. Confirm that an email header dates the message rather than every event mentioned in it, and that a file/capture timestamp has not been promoted into business chronology. Unknowns and overlapping intervals must remain unresolved where evidence does not settle them. A checker-passed date is only structurally valid.

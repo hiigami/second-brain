@@ -1,5 +1,26 @@
 # Real Stage 2 pilot acceptance
 
+## Targeted ingestion and context cohort (pending real authorization)
+
+Use the same human-labeled claims and tasks for baseline and revised workflows,
+with fixed GLM behavior. Include mixed-project sources, aliases and implicit
+references, shared components, missing qualifiers, proposals, contradictions,
+changed selected dependencies and retained prior claims. Agree thresholds before
+results; no authorized real cohort or thresholds exist in this checkout.
+
+Attribution precision = correctly admitted home claims / all admitted home claims;
+recall = correctly admitted home claims / labeled relevant home claims. Count
+uncertain attribution and unavailable evidence separately. Unrelated exposure =
+unnecessary packet characters / all exposed packet characters; report retained
+storage bytes separately. Context recall = retrieved needed qualified facts /
+labeled needed facts. Retention/conflict coverage = retained supported claims or
+represented material conflicts / labeled expected claims or conflicts. Count lost
+qualifiers and unsupported promotion per assessed claim. Record answer usefulness
+with predefined task criteria, review minutes and preparation latency separately
+from model/runtime and scoped-export effort. Require zero unauthorized capture or
+disclosure, fabricated evidence, silent proposal promotion and unintended removal.
+Synthetic tests establish engine behavior only; real usefulness remains pending.
+
 ## Pilot selection
 
 Choose one project with a manageable source set and one concrete question, for example: “What is the current requirement, what evidence records the decision, and does this small code/schema slice reveal a discrepancy?” Prefer material with a known historical ambiguity or an existing Claude analysis so that utility can be assessed.

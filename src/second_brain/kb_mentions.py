@@ -136,6 +136,11 @@ def build_mention_report(run: Path, registry: dict) -> dict:
     for segment in (segments or {}).get("segments", []):
         by_evidence[segment["evidence_id"]].append(segment)
     mentions = []
+    selected = None
+    if "targeted" in manifest:
+        from .kb_intervals import selected_ranges
+        from .kb_targeting import load_targeted
+        selected = selected_ranges(run, manifest, load_targeted(run, manifest))[0]
     for f in sorted(manifest["files"], key=lambda x: (x["source_id"], x["relative_path"])):
         raw = read_stable(inside(run, f["snapshot_path"]), manifest["limits"]["max_file_bytes"])
         expected = f["document"]["text_sha256"] if "document" in f else f["sha256"]
@@ -143,6 +148,8 @@ def build_mention_report(run: Path, registry: dict) -> dict:
             raise KBError(f"Snapshot integrity changed during mention scan: {f['evidence_id']}")
         lines = raw.decode("utf-8-sig").splitlines()
         for line_number, line in enumerate(lines, 1):
+            if selected is not None and not any(a <= line_number <= b for a,b in selected.get(f["evidence_id"], [])):
+                continue
             for match in _line_matches(line, index):
                 if len(mentions) >= _MAX_MENTIONS:
                     raise KBError("Mention scan exceeds 10,000 candidate occurrences")
