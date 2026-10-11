@@ -7,8 +7,9 @@ from pathlib import Path
 
 from .kb_common import (KBError, LEGACY_CAPTURE_VERSIONS, LEGACY_SECRET_PATTERNS,
                        LEGACY_TEXT_EXTENSIONS, TOOL_VERSION,
-                       ai_summary_name, check_timestamp, contract, evidence_identity, extraction_snapshot_paths,
-                       inside, json_sha, no_symlinks, read_json, read_stable, relative,
+                       ai_summary_name, blocked_inventory_error, check_timestamp, contract,
+                       error_context, evidence_identity, extraction_snapshot_paths,
+                       inside, integrity_error, json_sha, no_symlinks, read_json, read_stable, relative,
                        representation_identity,
                        run_cli, sha, utc_now, write_json_new)
 from .kb_segments import build_segment_inventory
@@ -22,12 +23,12 @@ def load_segment_inventory(run: Path, manifest: dict) -> dict | None:
         return None
     raw = read_stable(inside(run, binding["path"]), 64 * 1024 * 1024)
     if sha(raw) != binding["sha256"]:
-        raise KBError("Segment inventory checksum mismatch")
+        raise integrity_error("Segment inventory checksum mismatch", inside(run, binding["path"]))
     data = read_json(inside(run, binding["path"]))
-    contract(data, "segments")
+    contract(data, "segments", source=inside(run, binding["path"]))
     if data["project_id"] != manifest["project_id"] or data["run_id"] != manifest["run_id"] \
             or len(data["segments"]) != binding["count"]:
-        raise KBError("Segment inventory manifest binding mismatch")
+        raise integrity_error("Segment inventory manifest binding mismatch", inside(run, binding["path"]))
     return data
 
 
@@ -36,23 +37,24 @@ def load_manifest(run: Path) -> dict:
     raw = read_stable(inside(run, "manifest.json"), 16 * 1024 * 1024)
     seal = read_stable(inside(run, "manifest.sha256"), 256).decode("ascii").strip()
     if sha(raw) != seal:
-        raise KBError("Manifest checksum mismatch; restore the original run, do not reseal a modified manifest")
+        raise integrity_error("Manifest checksum mismatch; restore the original run, do not reseal a modified manifest", run / "manifest.json")
     m = read_json(run / "manifest.json")
-    contract(m, "manifest")
+    contract(m, "manifest", source=run / "manifest.json")
     check_timestamp(m["created_at"])
     cfg = read_json(inside(run, m["config_snapshot"]))
-    contract(cfg, "project")
+    contract(cfg, "project", source=inside(run, m["config_snapshot"]))
     if json_sha(cfg) != m["config_sha256"] or cfg["project"]["id"] != m["project_id"]:
-        raise KBError("Configuration snapshot mismatch")
+        raise KBError("Configuration snapshot mismatch", path=inside(run, m["config_snapshot"]),
+                      suggestion="Restore the original snapshot from an authorized backup or create a new run; do not reseal changed evidence.")
     source_scope = None
     if "source_scope" in m:
         if m["tool_version"] in {"0.1.0", "0.2.0", "0.2.1"}:
             raise KBError("Historical manifest cannot declare an expanded source scope")
         source_scope_raw = read_stable(inside(run, m["source_scope"]["path"]), 16 * 1024 * 1024)
         if sha(source_scope_raw) != m["source_scope"]["sha256"]:
-            raise KBError("Source scope snapshot checksum mismatch")
+            raise integrity_error("Source scope snapshot checksum mismatch", inside(run, m["source_scope"]["path"]))
         source_scope = read_json(inside(run, m["source_scope"]["path"]))
-        contract(source_scope, "source-scope")
+        contract(source_scope, "source-scope", source=inside(run, m["source_scope"]["path"]))
         if source_scope["project_id"] != m["project_id"]:
             raise KBError("Source scope project mismatch")
     sources = {s["id"]: s for s in m["sources"]}
@@ -149,28 +151,28 @@ def load_manifest(run: Path) -> dict:
                 raise KBError(f"Document original identity mismatch: {eid}")
             original_raw = read_stable(inside(run, doc["original_snapshot_path"]), m["limits"]["max_file_bytes"])
             if sha(original_raw) != doc["original_sha256"] or len(original_raw) != doc["original_bytes"]:
-                raise KBError(f"Document original integrity failure: {eid}")
+                raise integrity_error(f"Document original integrity failure: {eid}", inside(run, doc["original_snapshot_path"]))
             raw = read_stable(inside(run, f["snapshot_path"]), m["limits"]["max_file_bytes"])
             if sha(raw) != doc["text_sha256"] or len(raw) != doc["text_bytes"]:
-                raise KBError(f"Document derived-text integrity failure: {eid}")
+                raise integrity_error(f"Document derived-text integrity failure: {eid}", inside(run, f["snapshot_path"]))
             try:
                 lines_text = raw.decode("utf-8-sig")
             except UnicodeError as exc:
-                raise KBError(f"Invalid derived-text encoding: {eid}") from exc
+                raise integrity_error(f"Invalid derived-text encoding: {eid}", inside(run, f["snapshot_path"])) from exc
             if b"\x00" in raw or len(lines_text.splitlines()) != doc["text_line_count"] \
                     or doc["text_line_count"] != f["line_count"] \
                     or doc["original_sha256"] == doc["text_sha256"]:
-                raise KBError(f"Document derived-text content mismatch: {eid}")
+                raise integrity_error(f"Document derived-text content mismatch: {eid}", inside(run, f["snapshot_path"]))
             metadata_raw = read_stable(inside(run, doc["metadata_snapshot_path"]), m["limits"]["max_file_bytes"])
             if sha(metadata_raw) != doc["metadata_sha256"]:
-                raise KBError(f"Document metadata integrity failure: {eid}")
+                raise integrity_error(f"Document metadata integrity failure: {eid}", inside(run, doc["metadata_snapshot_path"]))
             seal = read_stable(inside(run, doc["metadata_snapshot_path"] + ".sha256"), 128).decode("ascii").strip()
             if seal != doc["metadata_sha256"]:
-                raise KBError(f"Document metadata sidecar mismatch: {eid}")
+                raise integrity_error(f"Document metadata sidecar mismatch: {eid}", inside(run, doc["metadata_snapshot_path"] + ".sha256"))
             try:
                 metadata = json.loads(metadata_raw.decode("utf-8"))
             except (UnicodeError, ValueError) as exc:
-                raise KBError(f"Document metadata is not readable JSON: {eid}") from exc
+                raise integrity_error(f"Document metadata is not readable JSON: {eid}", inside(run, doc["metadata_snapshot_path"])) from exc
             if metadata.get("schema_version") != "1.0" or metadata.get("status") != "extracted_needs_review" \
                     or metadata.get("source_sha256") != f["sha256"] \
                     or metadata.get("text_sha256") != doc["text_sha256"] \
@@ -178,7 +180,7 @@ def load_manifest(run: Path) -> dict:
                     or metadata.get("options_sha256") != doc["options_sha256"] \
                     or not isinstance(metadata.get("segments"), list) \
                     or len(metadata["segments"]) != doc["segment_count"]:
-                raise KBError(f"Document metadata disagrees with the manifest: {eid}")
+                raise integrity_error(f"Document metadata disagrees with the manifest: {eid}", inside(run, doc["metadata_snapshot_path"]))
             if representation is not None:
                 expected_rep = representation_identity("derived_text", f["sha256"], doc["text_sha256"],
                                                         doc["adapter_version"], doc["parsers"],
@@ -202,7 +204,7 @@ def load_manifest(run: Path) -> dict:
             raise KBError("Unexpected snapshot path")
         raw = read_stable(inside(run, f["snapshot_path"]), m["limits"]["max_file_bytes"])
         if sha(raw) != f["sha256"] or len(raw) != f["bytes"]:
-            raise KBError(f"Snapshot integrity failure: {eid}")
+            raise integrity_error(f"Snapshot integrity failure: {eid}", inside(run, f["snapshot_path"]))
         if representation is not None and representation != {
                 "version": "1", "kind": "source_text", "text_sha256": f["sha256"],
                 "identity_sha256": representation_identity("source_text", f["sha256"], f["sha256"])}:
@@ -210,9 +212,9 @@ def load_manifest(run: Path) -> dict:
         try:
             lines = raw.decode("utf-8-sig").splitlines()
         except UnicodeError as exc:
-            raise KBError(f"Invalid snapshot encoding: {eid}") from exc
+            raise integrity_error(f"Invalid snapshot encoding: {eid}", inside(run, f["snapshot_path"])) from exc
         if b"\x00" in raw or len(lines) != f["line_count"]:
-            raise KBError(f"Snapshot line count/content mismatch: {eid}")
+            raise integrity_error(f"Snapshot line count/content mismatch: {eid}", inside(run, f["snapshot_path"]))
         if f["provenance"] is not None:
             check_timestamp(f["provenance"]["captured_at"])
         content_date = (f.get("temporal") or {}).get("content_date")
@@ -301,9 +303,14 @@ def semantic_hints(m: dict, data: dict) -> list[dict]:
 
 
 def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) -> dict:
+    with error_context(records_path):
+        return _check_records(run, m, records_path, stage2)
+
+
+def _check_records(run: Path, m: dict, records_path: Path, stage2: bool) -> dict:
     no_symlinks(records_path)
     data = read_json(records_path)
-    contract(data, "records")
+    contract(data, "records", source=records_path)
     if data["project_id"] != m["project_id"] or data["run_id"] != m["run_id"]:
         raise KBError("Records belong to another project or run")
     if "targeted" in m and data["schema_version"] != "0.6":
@@ -325,10 +332,15 @@ def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) 
              for eid, f in files.items()}
     records = {r["id"]: r for r in data["records"]}
     if len(records) != len(data["records"]):
-        raise KBError("Duplicate record ids")
+        duplicates = sorted(rid for rid, count in Counter(r["id"] for r in data["records"]).items() if count > 1)
+        raise KBError(f"Duplicate record ids: {duplicates}",
+                      suggestion="Give each distinct claim a unique record id and update its relation targets.")
     coverage = {x["evidence_id"]: x for x in data["coverage"]}
     if len(coverage) != len(data["coverage"]) or set(coverage) != set(files):
-        raise KBError("Coverage must list every manifest evidence id exactly once")
+        duplicates = sorted(eid for eid, count in Counter(c["evidence_id"] for c in data["coverage"]).items() if count > 1)
+        raise KBError("Coverage must list every manifest evidence id exactly once; "
+                      f"missing={sorted(set(files) - set(coverage))}, unknown={sorted(set(coverage) - set(files))}, duplicate={duplicates}",
+                      suggestion="Reconcile the candidate coverage with this run's manifest or coverage stub, using one honest disposition per evidence id.")
     for eid, cov in coverage.items():
         if cov["disposition"] == "triaged_out":
             if data["schema_version"] == "0.1":
@@ -341,24 +353,32 @@ def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) 
     referenced_segments = set()
     citation_count = 0
     relation_count = 0
-    def cite(ev: dict) -> None:
+    def cite(ev: dict, record_id: str) -> None:
         nonlocal citation_count
         eid = ev["evidence_id"]
         if eid not in files:
-            raise KBError(f"Unknown/stale evidence id: {eid}")
+            raise KBError(f"Unknown/stale evidence id: {eid} (record {record_id})",
+                          suggestion="Use an evidence id from this run's manifest and revalidate the citation against its frozen lines.")
         start, end = ev["start_line"], ev["end_line"]
+        source = files[eid]
+        context = (f"record {record_id}; frozen file {run / source['snapshot_path']}; "
+                   f"source {source['source_id']}:{source['relative_path']}")
+        suggestion = "Correct the candidate citation using the exact lines in the frozen file; do not edit the frozen evidence."
         if start > end or end > len(lines[eid]):
-            raise KBError(f"Citation line range is invalid: {eid} {start}:{end}")
+            raise KBError(f"Citation line range is invalid: {eid} {start}:{end} ({context}); file has {len(lines[eid])} lines",
+                          suggestion=suggestion)
         expected = "\n".join(lines[eid][start - 1:end])
         if ev["quote"] != expected:
-            raise KBError(f"Quote differs from exact frozen lines: {eid} {start}:{end}")
+            raise KBError(f"Quote differs from exact frozen lines: {eid} {start}:{end} ({context})",
+                          suggestion=suggestion)
         if segment_bound:
             segment_id = ev.get("segment_id")
             segment = segments.get(segment_id)
             if segment is None or segment["evidence_id"] != eid \
                     or segment["representation_sha256"] != ev.get("representation_sha256") \
                     or start < segment["line_start"] or end > segment["line_end"]:
-                raise KBError(f"Citation does not bind one frozen segment: {eid} {start}:{end}")
+                raise KBError(f"Citation does not bind one frozen segment: {eid} {start}:{end} ({context})",
+                              suggestion="Check the segment id, representation hash and line bounds against segments.snapshot.json; correct the candidate citation.")
             referenced_segments.add(segment_id)
         elif "segment_id" in ev or "representation_sha256" in ev:
             raise KBError("Segment citations require records 0.3")
@@ -368,7 +388,7 @@ def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) 
         if not r["id"].startswith(RECORD_KIND_PREFIX[r["kind"]] + "-"):
             raise KBError(f"Record prefix/kind mismatch: {r['id']}")
         for ev in r["evidence"]:
-            cite(ev)
+            cite(ev, r["id"])
         if r["kind"] == "decision" and all(files[ev["evidence_id"]]["source_type"] == "repository" for ev in r["evidence"]):
             raise KBError(f"Decision cites only repository evidence: {r['id']}. Code shows an implementation "
                           "observation, not product intent; cite a non-repository source, or record it as an "
@@ -393,7 +413,7 @@ def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) 
             cited = {ev["evidence_id"] for ev in r["evidence"]}
             for finding in inv["findings"]:
                 for ev in finding["evidence"]:
-                    cite(ev)
+                    cite(ev, r["id"])
                     cited.add(ev["evidence_id"])
             if not cited.issubset(inv["scope"]):
                 raise KBError(f"Investigation cites beyond declared scope: {r['id']}")
@@ -469,7 +489,7 @@ def check_records(run: Path, m: dict, records_path: Path, stage2: bool = False) 
 def check_run(run: Path, records_path: Path | None = None, stage2: bool = False, live: bool = False, historical: bool = False) -> dict:
     m = load_manifest(run)
     if m["status"] != "ready":
-        raise KBError("Inventory is blocked; inspect manifest.issues and create a corrected new run")
+        raise blocked_inventory_error(run, m)
     from .kb_context import check_context
     context_report = check_context(run,m, Path(m["targeted"]["config_path"]) if "targeted" in m and not historical else None)
     if live:

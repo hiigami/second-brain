@@ -21,7 +21,7 @@ def check_referrals(run: Path, manifest: dict, records: dict) -> dict:
         raise KBError("Mention report differs from the frozen registry or evidence")
     path = inside(run, "proposals/referrals.json") if (run / "proposals/referrals.json").is_file() else inside(run, "referrals.json")
     proposals = read_json(path)
-    contract(proposals, "referrals")
+    contract(proposals, "referrals", source=path)
     if records["schema_version"] == "0.6" and proposals["schema_version"] != "1.1":
         raise KBError("Records 0.6 require referrals 1.1 with manual-reference accounting")
     if proposals["project_id"] != manifest["project_id"] or proposals["run_id"] != manifest["run_id"]:

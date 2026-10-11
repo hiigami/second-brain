@@ -6,7 +6,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from .kb_common import (KBError, content_sort_key, inside, matches, no_symlinks, read_json, read_stable, run_cli,
+from .kb_common import (KBError, blocked_inventory_error, content_sort_key, inside, matches, no_symlinks, read_json, read_stable, run_cli,
                        validate_pattern, write_json_new, write_new)
 from .kb_check import load_manifest, load_segment_inventory
 
@@ -116,7 +116,7 @@ def build_packets(run: Path, max_chars: int = 16000, selected: list[str] | None 
                   segment_ids: list[str] | None = None, ranges: list[dict] | None = None) -> dict:
     m = load_manifest(run)
     if m["status"] != "ready":
-        raise KBError("Cannot build packets from a blocked inventory")
+        raise blocked_inventory_error(run, m)
     if max_chars < 1000:
         raise KBError("max_chars must be at least 1000")
     known = {f["evidence_id"] for f in m["files"]}

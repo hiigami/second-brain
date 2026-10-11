@@ -4,6 +4,7 @@
 Runtime: Python 3.14 through uv (see pyproject.toml). This module uses only the
 standard library; the document parsers are imported by kb_document_extractors.
 """
+import errno
 import fnmatch
 import hashlib
 import json
@@ -12,6 +13,7 @@ import re
 import stat
 import sys
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
@@ -68,6 +70,72 @@ def ai_summary_name(relative_path: str) -> bool:
 
 class KBError(Exception):
     """An actionable contract or filesystem failure."""
+
+    def __init__(self, message: str, *, path: Path | None = None, suggestion: str | None = None):
+        super().__init__(message)
+        self.path = path
+        self.suggestion = suggestion
+
+    def __str__(self) -> str:
+        parts = [super().__str__()]
+        if self.path is not None:
+            parts.append(f"File: {self.path}")
+        if self.suggestion:
+            parts.append(f"Suggestion: {self.suggestion}")
+        return "\n".join(parts)
+
+
+def filesystem_error(exc: OSError, path: Path | None = None) -> KBError:
+    """Retain the OS reason and add recovery guidance only for known failures."""
+    suggestions = {
+        errno.ENOENT: "Check the supplied path and that the required input exists. Restore missing frozen artifacts from an authorized backup.",
+        errno.EACCES: "Check read/write permissions for this path and access to its parent directories.",
+        errno.EPERM: "Check permissions for this path and access to its parent directories.",
+        errno.EISDIR: "Supply a regular file instead of a directory.",
+        errno.ENOTDIR: "Check that every parent component of the supplied path is a directory.",
+        errno.EEXIST: "Choose a new output path or run id; existing evidence must not be overwritten.",
+        errno.ENOSPC: "Make space available on the destination filesystem, then retry with a new output path if a partial output remains.",
+        errno.EROFS: "Use an approved writable output location, or check whether the filesystem was mounted read-only.",
+    }
+    return KBError(str(exc), path=Path(exc.filename) if exc.filename else path,
+                   suggestion=suggestions.get(exc.errno))
+
+
+@contextmanager
+def error_context(path: Path):
+    """Attach the known artifact path without replacing more specific context."""
+    try:
+        yield
+    except KBError as exc:
+        if exc.path is None:
+            exc.path = path
+        raise
+    except OSError as exc:
+        raise filesystem_error(exc, path) from exc
+
+
+def blocked_inventory_error(run: Path, manifest: dict) -> KBError:
+    """Render existing capture failures without modifying the diagnostic manifest."""
+    failures = [issue for issue in manifest["issues"] if issue["severity"] == "error"]
+    roots = {source["id"]: Path(source["root"]) for source in manifest["sources"]}
+    lines = [f"Inventory is blocked: {len(failures)} blocking issue(s)."]
+    for issue in failures[:20]:
+        sid, relative_path = issue["source_id"], issue["path"]
+        root = roots.get(sid)
+        location = root / relative_path if root is not None and relative_path else root
+        if location is None:
+            location = relative_path or run / "manifest.json"
+        source = f" (source {sid})" if sid else ""
+        lines.append(f"  [{issue['code']}] {location}{source}: {issue['detail']}")
+    if len(failures) > 20:
+        lines.append(f"  {len(failures) - 20} additional blocking issue(s); see issues in the manifest below.")
+    return KBError("\n".join(lines), path=run / "manifest.json",
+                   suggestion="Correct the reported source or configuration problems, then create a new run with a new run id. Do not edit the frozen manifest or snapshots.")
+
+
+def integrity_error(message: str, path: Path) -> KBError:
+    return KBError(message, path=path,
+                   suggestion="Restore the original artifact from an authorized backup or create a new run; do not edit or reseal frozen evidence.")
 
 
 def utc_now() -> str:
@@ -148,11 +216,26 @@ def _unique_pairs(items: list) -> dict:
 
 def read_json(path: Path) -> Any:
     try:
-        text = read_stable(path, 16 * 1024 * 1024).decode("utf-8-sig")
+        raw = read_stable(path, 16 * 1024 * 1024)
+    except OSError as exc:
+        raise filesystem_error(exc, path) from exc
+    except KBError as exc:
+        if exc.path is None:
+            exc.path = path
+        raise
+    try:
+        text = raw.decode("utf-8-sig")
         return json.loads(text, object_pairs_hook=_unique_pairs,
                           parse_constant=lambda x: (_ for _ in ()).throw(KBError(f"Invalid JSON: {x}")))
-    except (OSError, ValueError, UnicodeError) as exc:
-        raise KBError(f"Cannot read JSON {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise KBError(f"Cannot read JSON: input is not UTF-8 ({exc.reason}, byte offset {exc.start})",
+                      path=path, suggestion="Export editable input as UTF-8 JSON. Restore frozen artifacts from an authorized backup instead of editing them.") from exc
+    except json.JSONDecodeError as exc:
+        raise KBError(f"Invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}", path=path,
+                      suggestion="Correct the JSON syntax at the reported location in editable input. Restore frozen artifacts instead of editing them.") from exc
+    except (KBError, ValueError) as exc:
+        raise KBError(f"Cannot read JSON: {exc}", path=path,
+                      suggestion="Use unique object keys and standard JSON values (no NaN or Infinity). Correct editable input; restore frozen artifacts instead of editing them.") from exc
 
 
 def no_symlinks(path: Path) -> None:
@@ -160,28 +243,28 @@ def no_symlinks(path: Path) -> None:
     absolute = Path(os.path.abspath(path))
     for part in (absolute, *absolute.parents):
         if part.is_symlink():
-            raise KBError(f"Symlink not permitted: {part}")
+            raise KBError(f"Symlink not permitted: {part}", path=part)
 
 
 def read_stable(path: Path, limit: int) -> bytes:
     """Bounded regular-file read; reject final-component symlinks and detected writes."""
     if path.is_symlink():
-        raise KBError(f"Symlink not permitted: {path}")
+        raise KBError(f"Symlink not permitted: {path}", path=path)
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     fd = os.open(path, flags)
     with os.fdopen(fd, "rb") as handle:
         before = os.fstat(handle.fileno())
         if not stat.S_ISREG(before.st_mode):
-            raise KBError(f"Not a regular file: {path}")
+            raise KBError(f"Not a regular file: {path}", path=path)
         if before.st_size > limit:
-            raise KBError(f"File exceeds {limit} bytes: {path}")
+            raise KBError(f"File exceeds {limit} bytes: {path}", path=path)
         data = handle.read(limit + 1)
         after = os.fstat(handle.fileno())
     if len(data) > limit:
-        raise KBError(f"File exceeds {limit} bytes: {path}")
+        raise KBError(f"File exceeds {limit} bytes: {path}", path=path)
     attrs = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
     if any(getattr(before, x) != getattr(after, x) for x in attrs) or len(data) != after.st_size:
-        raise KBError(f"File changed during read; retry on a stable source: {path}")
+        raise KBError(f"File changed during read; retry on a stable source: {path}", path=path)
     return data
 
 
@@ -241,6 +324,10 @@ SCHEMA_KEYWORDS = frozenset({
     "items", "minItems", "uniqueItems", "minLength", "maxLength", "pattern", "minimum", "maximum"})
 
 
+class SchemaError(KBError):
+    """The engine schema itself cannot be validated by this implementation."""
+
+
 def validate_schema(data: Any, schema: dict, at: str = "$") -> None:
     """Validate exactly the JSON Schema keyword subset used by this bundle.
 
@@ -248,18 +335,23 @@ def validate_schema(data: Any, schema: dict, at: str = "$") -> None:
     Unsupported keywords raise KBError so a schema edit cannot be silently ignored.
     """
     if not isinstance(schema, dict):
-        raise KBError(f"{at}: schema node must be an object")
+        raise SchemaError(f"{at}: schema node must be an object")
     unknown = set(schema) - SCHEMA_KEYWORDS
     if unknown:
-        raise KBError(f"{at}: unsupported schema keywords {sorted(unknown)}")
+        raise SchemaError(f"{at}: unsupported schema keywords {sorted(unknown)}")
     if "anyOf" in schema:
+        failures = []
         for option in schema["anyOf"]:
             try:
                 validate_schema(data, option, at)
                 return
-            except KBError:
-                pass
-        raise KBError(f"{at}: no allowed representation matched")
+            except KBError as exc:
+                failures.append(exc)
+        schema_failure = next((exc for exc in failures if isinstance(exc, SchemaError)), None)
+        if schema_failure is not None:
+            raise schema_failure
+        details = "\n".join(f"  Option {i}: {message}" for i, message in enumerate(failures, 1))
+        raise KBError(f"{at}: no allowed representation matched\n{details}")
     if "const" in schema and data != schema["const"]:
         raise KBError(f"{at}: expected {schema['const']!r}")
     if "enum" in schema and data not in schema["enum"]:
@@ -287,7 +379,7 @@ def validate_schema(data: Any, schema: dict, at: str = "$") -> None:
                 validate_schema(value, additional, f"{at}.{key}")
     elif isinstance(data, list):
         if len(data) < schema.get("minItems", 0):
-            raise KBError(f"{at}: too few items")
+            raise KBError(f"{at}: too few items; expected at least {schema['minItems']}, got {len(data)}")
         if schema.get("uniqueItems") and len({canonical(x) for x in data}) != len(data):
             raise KBError(f"{at}: duplicate items")
         for i, value in enumerate(data):
@@ -295,15 +387,17 @@ def validate_schema(data: Any, schema: dict, at: str = "$") -> None:
                 validate_schema(value, schema["items"], f"{at}[{i}]")
     elif isinstance(data, str):
         if len(data) < schema.get("minLength", 0) or len(data) > schema.get("maxLength", 10**12):
-            raise KBError(f"{at}: invalid string length")
+            bounds = [f"{key}={schema[key]}" for key in ("minLength", "maxLength") if key in schema]
+            raise KBError(f"{at}: invalid string length {len(data)}; expected {', '.join(bounds)}")
         if "pattern" in schema and re.search(schema["pattern"], data) is None:
             raise KBError(f"{at}: does not match {schema['pattern']}")
     elif type(data) is int:
         if data < schema.get("minimum", -10**18) or data > schema.get("maximum", 10**18):
-            raise KBError(f"{at}: out of range")
+            bounds = [f"{key}={schema[key]}" for key in ("minimum", "maximum") if key in schema]
+            raise KBError(f"{at}: out of range; expected {', '.join(bounds)}")
 
 
-def contract(data: Any, name: str) -> None:
+def contract(data: Any, name: str, *, source: Path | None = None) -> None:
     """Validate against the current schema, or a frozen schemas/legacy/<name>-<version> one."""
     path = SCHEMAS / f"{name}.schema.json"
     version = data.get("schema_version") if isinstance(data, dict) else None
@@ -311,7 +405,15 @@ def contract(data: Any, name: str) -> None:
         legacy = SCHEMAS / "legacy" / f"{name}-{version}.schema.json"
         if legacy.is_file():
             path = legacy
-    validate_schema(data, read_json(path))
+    schema = read_json(path)
+    try:
+        validate_schema(data, schema)
+    except SchemaError as exc:
+        raise SchemaError(f"Invalid engine schema: {exc}", path=path,
+                          suggestion="Report this schema/validator incompatibility to the tool maintainer; changing input or frozen evidence cannot fix it.") from exc
+    except KBError as exc:
+        raise KBError(f"Invalid {name} data: {exc}", path=source,
+                      suggestion="Correct the listed field to match the expected format in editable input. For frozen artifacts, restore the original or create a new run; do not edit or reseal them.") from exc
 
 
 def warning_summary(manifest: dict) -> dict:
@@ -367,7 +469,7 @@ def load_project(path: Path) -> tuple[dict, Path, dict]:
     if path.name != "project.json" or path.parent.name != "config":
         raise KBError("Project config must live at <project-root>/config/project.json")
     cfg = read_json(path)
-    contract(cfg, "project")
+    contract(cfg, "project", source=path)
     project = path.parent.parent
     outputs = {"knowledge": inside(project, cfg["knowledge"]["path"]),
                "approved": inside(project, cfg["knowledge"]["approved"]),
@@ -412,7 +514,7 @@ def load_source_scope(cfg: dict, project: Path, locations: dict) -> tuple[dict |
         return None, list(cfg["sources"]), dict(locations["source_roots"])
     no_symlinks(path)
     scope = read_json(path)
-    contract(scope, "source-scope")
+    contract(scope, "source-scope", source=path)
     if scope["project_id"] != cfg["project"]["id"]:
         raise KBError("Source scope belongs to another project")
     roots = dict(locations["source_roots"])
@@ -483,6 +585,7 @@ def run_cli(func: Callable[[], int]) -> None:
     try:
         code = func()
     except (KBError, OSError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        diagnostic = filesystem_error(exc) if isinstance(exc, OSError) else exc
+        print(f"ERROR: {diagnostic}", file=sys.stderr)
         code = 2
     raise SystemExit(code)

@@ -49,7 +49,7 @@ def current_release_records(approved: Path, project_id: str) -> tuple[str | None
         if sha(read_stable(inside(release, file), 16 * 1024 * 1024)) != current[key]:
             raise KBError(f"Current release integrity failure: {file}")
     old_review = read_json(release / "review.json")
-    contract(old_review, "review")
+    contract(old_review, "review", source=release / "review.json")
     if old_review["schema_version"] in {"0.3", "0.4"}:
         if sha(read_stable(inside(release, "review-report.md"), 16 * 1024 * 1024)) != old_review["review_report_sha256"]:
             raise KBError("Current release integrity failure: review-report.md")
@@ -446,7 +446,7 @@ def publish(config: Path, run: Path, review_path: Path, human_approved: bool = F
     no_symlinks(review_path)
     review_raw = read_stable(review_path, 16 * 1024 * 1024)
     review = read_json(review_path)
-    contract(review, "review")
+    contract(review, "review", source=review_path)
     if review["schema_version"] != ("0.4" if routing else "0.3"):
         raise KBError("Review version predates or mismatches the report-bound routing contract; prepare again")
     if review["decision"] != "approve" or not review["reviewer"].strip() or review["reviewed_at"] is None:

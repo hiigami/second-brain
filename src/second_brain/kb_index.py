@@ -20,7 +20,7 @@ MAX_ENTRIES = 10000
 def _access(path: Path) -> dict:
     no_symlinks(path)
     access = read_json(path)
-    contract(access, "index-access")
+    contract(access, "index-access", source=path)
     if not access["authorized_by"].strip() or not access["reason"].strip() \
             or parse_ts(access["authorized_at"]) > datetime.now(timezone.utc) + timedelta(seconds=CLOCK_SKEW_SECONDS):
         raise KBError("Index access requires a named operator, reason, and non-future timestamp")
@@ -125,8 +125,8 @@ def _generation(data: dict) -> str:
     return "IDX-" + json_sha({k: v for k, v in data.items() if k != "generation_id"})[:24]
 
 
-def _validate_index(data: dict) -> None:
-    contract(data, "global-index")
+def _validate_index(data: dict, path: Path | None = None) -> None:
+    contract(data, "global-index", source=path)
     if len(data["releases"]) > MAX_RELEASES or len(data["entries"]) > MAX_ENTRIES:
         raise KBError("Index exceeds 1,000 releases or 10,000 entries; narrow the access set")
     if data["generation_id"] != _generation(data):
@@ -227,7 +227,7 @@ def build_index(access_path: Path, registry_path: Path, configs: list[Path], inc
         if before is not None:
             # Rebuild may repair an edited index, but must not overwrite an
             # unrelated file simply because its path was supplied.
-            contract(read_json(output), "global-index")
+            contract(read_json(output), "global-index", source=output)
         data = _snapshot(context, include_history)
         if (read_stable(output, LIMIT) if output.exists() else None) != before:
             raise KBError("Index changed during rebuild; retry")
@@ -245,7 +245,7 @@ def _verified(access_path: Path, registry_path: Path, configs: list[Path]) -> di
         raise KBError("Index rebuild is in progress; retry")
     before = read_stable(output, LIMIT)
     data = read_json(output)
-    _validate_index(data)
+    _validate_index(data, output)
     if data["access_sha256"] != json_sha(context["access"]) or data["registry_sha256"] != json_sha(context["registry"]):
         raise KBError("Index access or registry is stale; rebuild before querying")
     expected = _snapshot(context, data["include_history"])

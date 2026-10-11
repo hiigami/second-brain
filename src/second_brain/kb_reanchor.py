@@ -43,7 +43,7 @@ def approved_release(previous: Path, m: dict, records_path: Path) -> bool:
         return False
     no_symlinks(review_path)
     review = read_json(review_path)
-    contract(review, "review")
+    contract(review, "review", source=review_path)
     limit = 16 * 1024 * 1024
     return (review["decision"] == "approve" and review["run_id"] == m["run_id"]
             and review["records_sha256"] == sha(read_stable(records_path, limit))
@@ -76,7 +76,7 @@ def reanchor(previous: Path, run: Path, out_dir: Path | None = None, citation_on
     old_path = _records_path(previous)
     no_symlinks(old_path)
     old = read_json(old_path)
-    contract(old, "records")
+    contract(old, "records", source=old_path)
     routed = old["schema_version"] in {"0.5", "0.6"}
     if routed and not citation_only:
         raise KBError("Routing-aware records 0.5 cannot be re-anchored automatically; reassess mentions, "

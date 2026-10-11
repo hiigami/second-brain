@@ -182,7 +182,7 @@ def _approved_release(config: Path, run_id: str | None = None) -> dict | None:
     manifest = load_manifest(release)
     records = read_json(inside(release, "records.json"))
     review = read_json(inside(release, "review.json"))
-    contract(review, "review")
+    contract(review, "review", source=release / "review.json")
     if review["schema_version"] not in {"0.3", "0.4"} or review["decision"] != "approve" \
             or not review["reviewer"].strip() or not all(review["checks"].values()) \
             or review["project_id"] != project_id or manifest["project_id"] != project_id \
@@ -403,7 +403,7 @@ def _capture(item: dict, review: dict, project: Path) -> None:
 def decide(config: Path, registry_path: Path, origin_config: Path, review_path: Path) -> dict:
     """Record an explicit human accept/decline/defer; acceptance only proposes work."""
     review = read_json(review_path)
-    contract(review, "intake-review")
+    contract(review, "intake-review", source=review_path)
     cfg, project, _ = load_project(config)
     registry = _registry(registry_path, cfg["project"]["id"])
     origin = _approved_release(origin_config)
@@ -438,7 +438,7 @@ def decide(config: Path, registry_path: Path, origin_config: Path, review_path: 
 def link_target(config: Path, link_path: Path) -> dict:
     """Audit an already published target claim using its own checked evidence."""
     review = read_json(link_path)
-    contract(review, "intake-link")
+    contract(review, "intake-link", source=link_path)
     target = _approved_release(config, review["target_run_id"])
     if target is None or review["target_review_sha256"] != target["review_sha256"]:
         raise KBError("Target release link is stale")

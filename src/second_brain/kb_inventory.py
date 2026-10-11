@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .kb_common import (DOCUMENT_EXTENSIONS, ENGINE, KBError, LEGACY_DOCUMENT_EXTENSIONS,
                        SECRET_PATTERNS, SOURCE_SCOPE_SNAPSHOT, TEXT_EXTENSIONS, TOOL_VERSION,
-                       ai_summary_name, canonical,
+                       ai_summary_name, blocked_inventory_error, canonical,
                        check_timestamp, contract, evidence_identity, excluded,
                        extraction_snapshot_paths, identifier, json_bytes, json_sha,
                        load_project, load_source_scope, matches, no_symlinks, read_json, read_stable,
@@ -316,7 +316,7 @@ def inventory(config_path: Path, run_id: str, baseline: Path | None = None,
     if provenance_path.exists():
         no_symlinks(provenance_path)
         p = read_json(provenance_path)
-        contract(p, "source-provenance")
+        contract(p, "source-provenance", source=provenance_path)
         for item in p["entries"]:
             relative(item["relative_path"])
             check_timestamp(item["origin"]["captured_at"])
@@ -634,6 +634,8 @@ def main() -> int:
                    help="With structured CSV: declare the first record as column labels; never inferred")
     a = p.parse_args()
     request = read_json(a.request) if a.request else None
+    if request is not None:
+        contract(request, "run-request", source=a.request)
     if a.dry_run:
         if request is None:
             raise KBError("Dry-run requires an explicit run request")
@@ -649,6 +651,8 @@ def main() -> int:
     documents_count = sum(1 for f in m["files"] if "document" in f)
     print(f"{m['status'].upper()}: {run}\nCaptured {len(m['files'])} files "
           f"({documents_count} documents); {len(m['issues'])} reported issues.")
+    if m["status"] != "ready":
+        print(f"ERROR: {blocked_inventory_error(run, m)}", file=sys.stderr)
     return 0 if m["status"] == "ready" else 2
 
 

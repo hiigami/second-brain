@@ -247,7 +247,7 @@ def verify(root):
     packet = read_json(root / "packet.json")
     if sha(encoded(packet)) != digest:
         raise KBError("Packet manifest must use the canonical encoding")
-    contract(packet, "visual-packet")
+    contract(packet, "visual-packet", source=root / "packet.json")
     if packet.get("schema_version") != VERSION or packet.get("limitations") not in (BASE_LIMITATIONS, MACOS_LIMITATIONS):
         raise KBError("Unsupported visual packet contract")
     parse_ts(packet["created_at"])
@@ -467,6 +467,7 @@ def main():
         result = {"status": "integrity_verified", "items": len(packet["items"]), "fidelity": "unmeasured"}
     else:
         assessment = read_json(args.assessment)
+        contract(assessment, "visual-assessment", source=args.assessment)
         result = export(args.packet, assessment, args.out) if args.command == "export" else assess(args.packet, assessment)
     print(json.dumps(result, indent=2))
     return 0

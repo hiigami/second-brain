@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from .kb_check import check_run, load_manifest, verify_live
-from .kb_common import (KBError, atomic_json, inside, json_sha, load_project,
+from .kb_common import (KBError, atomic_json, blocked_inventory_error, error_context, inside, json_sha, load_project,
                         load_source_scope, no_symlinks, read_json, read_stable,
                         run_cli, sha, utc_now, write_json_new, write_new)
 from .kb_context import prepare_context, check_context
@@ -57,7 +57,8 @@ def _tree(path: Path) -> list[Path]:
 def create_run(config: Path, request_path: Path, run_id: str, baseline: Path | None = None,
                dry_run: bool = False, resume: bool = False) -> dict:
     cfg, _, locations = load_project(config)
-    request = validate_request(read_json(request_path),cfg["project"]["id"])
+    with error_context(request_path):
+        request = validate_request(read_json(request_path),cfg["project"]["id"])
     report = preflight(config,request)
     if report["missing"]:
         raise KBError(f"Selected inputs missing: {report['missing']}")
@@ -130,7 +131,7 @@ def create_run(config: Path, request_path: Path, run_id: str, baseline: Path | N
         bundle = prepare_context(config,run_id,request)
         run, manifest = inventory(config,run_id,baseline,request=request,context_bundle=bundle)
         if manifest["status"] != "ready":
-            raise KBError(f"Capture blocked at {run}; inspect issues and create a corrected new run")
+            raise blocked_inventory_error(run, manifest)
         capture_paths = [run/"manifest.json",run/"manifest.sha256",run/"project.snapshot.json",run/"run-request.snapshot.json",
                          run/"segments.snapshot.json",*_tree(run/"snapshots")]
         if "source_scope" in manifest:

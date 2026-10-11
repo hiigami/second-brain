@@ -7,7 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from .kb_check import load_manifest, load_segment_inventory
-from .kb_common import (KBError, contract, inside, json_bytes, json_sha, no_symlinks, read_json,
+from .kb_common import (KBError, contract, error_context, inside, json_bytes, json_sha, no_symlinks, read_json,
                        read_stable, run_cli, sha, validate_pattern, write_new)
 
 _TOKEN = re.compile(r"[^\W_][\w\u0300-\u036f]*", re.UNICODE)
@@ -38,7 +38,8 @@ def _alias_key(value: str) -> tuple[str, ...]:
 def load_registry(path: Path) -> dict:
     """Validate registry shape, alias identity, and descriptive ownership paths."""
     no_symlinks(path)
-    return validate_registry(read_json(path))
+    with error_context(path):
+        return validate_registry(read_json(path))
 
 
 def validate_registry(registry: dict) -> dict:

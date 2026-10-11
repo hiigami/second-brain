@@ -1,5 +1,34 @@
 # Troubleshooting and recovery
 
+## Reading an error
+
+Failures keep exit code `2` and write diagnostics to stderr. JSON input errors
+identify the affected file and, for syntax errors, the line and column. Schema
+errors identify the JSON field (for example, `$.sources[0].include`) and the
+expected type or constraint. When a field permits several forms, the error lists
+why each form failed. `Suggestion:` gives the next action when one is known.
+An invalid engine schema is reported separately as a tool-maintainer issue.
+
+For example, a string supplied where the configuration expects a list produces:
+
+```text
+ERROR: Invalid project data: $.sources[0].include: expected ['array'], got str
+File: /approved/project/config/project.json
+Suggestion: Correct the listed field to match the expected format in editable input. For frozen artifacts, restore the original or create a new run; do not edit or reseal them.
+```
+
+Here, change the editable configuration from `"include": "**/*.md"` to
+`"include": ["**/*.md"]`. Quote, line-range, and segment-binding errors identify
+the candidate file, record id, evidence id, line range, and frozen file to inspect.
+Correct the candidate citation against that evidence; do not change frozen text
+to match a quote.
+
+Blocked inventory commands print up to 20 blocking issues with source paths,
+issue codes, and the original failure details. The same details appear when
+checking, preparing packets, or preparing a targeted run encounters a blocked
+inventory. Any omitted issue count and the manifest path point to the complete
+`issues` list. Correct the source/configuration and capture a new run.
+
 ## Missing or empty source
 
 Each configured path must be a readable directory. An individually empty source is an `empty_source_scope` warning; a run with no captured file at all is blocked. Globs are relative to that directory. An initializer's repository defaults expect top-level src, tests, or docs. Remove an unused source entry or narrow/change the scope deliberately; do not manufacture content for it.

@@ -23,7 +23,7 @@ def _policy_digest(config: Path) -> str | None:
 def _permission(path: Path, config: Path, run_id: str) -> dict:
     no_symlinks(path)
     permission = read_json(path)
-    contract(permission, "context-permission")
+    contract(permission, "context-permission", source=path)
     cfg, _, locations = load_project(config)
     if path.resolve().is_relative_to(locations["runs"]/run_id) or path.resolve().is_relative_to(locations["approved"]/run_id):
         raise KBError("Context permission must be maintained outside its immutable run/release")
@@ -118,7 +118,7 @@ def load_context_frozen(run: Path, manifest: dict, request: dict) -> dict | None
     if sha(read_stable(path,LIMIT)) != binding:
         raise KBError("Pinned context checksum mismatch; context cannot be replaced in place")
     bundle = read_json(path)
-    contract(bundle,"run-context")
+    contract(bundle,"run-context", source=path)
     if sha(json_bytes(bundle)) != binding:
         raise KBError("Pinned context changed while reading")
     spec = request["context"]
