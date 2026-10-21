@@ -2,7 +2,125 @@
 
 This report retains engine checks and synthetic validation results. Private project-run checks and findings are omitted.
 
-## Current local visual-review checkpoint — engine 0.4.0, adapter 0.6.2
+## Current DOCX comment capture — engine 0.4.0, adapter 0.7.0
+
+Executed 2026-10-06 on Linux with synthetic DOCX packages. The user's requested
+architect review passed before implementation. Comments now provide citable
+paragraph/table/hyperlink text and recorded annotation metadata, including raw
+dates, validated reply-parent links and current per-comment resolved flags.
+Missing extended metadata stays unknown; `resolved_at` stays null. Modern
+follow-up bodies and unsupported prose wrappers/extensions remain explicit gaps.
+No new dependencies, schema/configuration versions or model/provider calls were
+introduced, and no real project evidence, approval or publication was modified.
+
+The first seven synthetic cases failed against the previous comment omission.
+The architect's implementation review then reproduced hidden inline-wrapper
+prose loss and flagged an overly strict timezone-suffix restriction on modern
+`dateUtc`. Two regressions failed before the narrow fixes: wrapped prose now gets
+an unavailable issue; a timezone-free modern date retains its spelling and the
+attribute's defined UTC semantics. An initial checker-version edit had an
+indentation error, corrected before the passing focused run. The end-to-end
+negative-quote assertion was corrected to expect the checker's `KBError`.
+
+| Command or check | Result |
+| --- | --- |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest tests.test_docx_comments tests.test_document_formats tests.test_document_integration tests.test_segments tests.test_packaging` | **159 run, 158 passed, 1 skipped** at the first implementation checkpoint (optional LibreOffice `.ppt`). |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest tests.test_docx_comments tests.test_document_integration.DocumentRunTests.test_comment_only_capture_packets_and_exact_segment_citations tests.test_document_integration.DocumentRunTests.test_historical_docx_without_comment_extraction_remains_frozen tests.test_packaging.PackagingTests.test_docx_comment_worker_outside_checkout` | **23 passed** after the review fixes. Includes exact metadata/reply citations and fabricated-quote rejection, comment-only capture/check/packets, unchanged frozen 0.6.2 DOCX artifacts, incomparable new captures, and packaged DOCX extraction/verification outside the checkout. |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest discover -s tests` | **451 run, 450 passed, 1 skipped** (optional LibreOffice legacy `.ppt`). |
+| Architect read-only implementation re-review | **PASS**; both review findings closed. Independently executed **20 comment tests**, all passed, and `git diff --check`. |
+| Initial independent deputy review | **PASS**, no blocking findings. Reviewed all changed/new source, tests, docs, ADR and validation evidence; independently confirmed `git diff --check`. Representative Word-export fidelity and native macOS execution remain disclosed limitations. |
+| `git diff --check` | PASS. |
+
+### Fresh independent review follow-up
+
+A fresh reviewer found a P2 disclosure gap: the no-linked-comments-part branch
+returned before inspecting surviving main-document comment markers. A bounded
+synthetic reproduction preserved the source body and markers, but produced no
+annotation-specific gap. The new regression failed in all eight subcases before
+the fix: each of the three marker kinds alone and all three together, with the
+comments part either absent or present but unlinked. The branch now emits
+`docx_comment_anchor_unavailable` at the main-document locator before returning
+its empty annotation plan. Ordinary comment-free behavior remains unchanged.
+This early-return orchestration defect is covered by the discrete marker/part
+matrix and the ordinary-document negative case; property-based follow-up is not
+required for this bounded correction.
+
+| Follow-up command or check | Result |
+| --- | --- |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest tests.test_docx_comments tests.test_document_formats tests.test_document_integration tests.test_segments tests.test_packaging` | **167 run, 166 passed, 1 skipped** (optional LibreOffice legacy `.ppt`). The full-suite row above records the earlier checkpoint; the follow-up ran these relevant modules. |
+| Fresh independent reviewer re-review | **PASS**; prior P2 closed, no new findings. Independently ran the new marker regression and ordinary comment-free test: **2 passed**, and `git diff --check`. No files changed during review. |
+| `git diff --check` after recording results | PASS. |
+
+Representative Word-export interoperability, visual fidelity and native macOS
+execution of this feature remain unverified. Synthetic regression success is
+not semantic validation or business approval. Exact resolution time/history,
+reactions, mention identities and deleted comments remain unavailable.
+
+README verification ledger: the new capability paragraph introduces no full
+command or runnable snippet; the existing `--documents` flag is exercised by the
+inventory integration tests and packaged CLI tests in the full suite. The edited
+visual-review sentence only removes a stale adapter-version reference; its
+existing command family and linked workflow are unchanged.
+
+## Historical macOS compatibility repair — engine 0.4.0, adapter 0.6.2
+
+Executed 2026-10-06 on Linux with synthetic inputs. The user-supplied macOS
+report ran 419 tests and recorded 22 errors from the `/var` symlink path guard,
+one packaged visual-worker failure while setting `RLIMIT_AS`, and two skips.
+The visual test workspace now resolves the system temporary-directory alias,
+matching the existing packaging fixture. Production symlink checks are unchanged.
+
+Inspection also identified a later Linux-only `renameat2` call. macOS now uses
+native `renamex_np(RENAME_EXCL)` and CPU/file-size/time controls, with the absence
+of an imposed address-space cap disclosed in packet limitations. Linux retains
+the 512 MiB cap. Resource setup preserves tighter inherited soft/hard limits.
+The local workflow and ADR describe the platform differences and canonical paths.
+
+Before the repair, an existing work-confinement test reproduced the path error
+under a synthetic symlinked temporary parent. Three new Darwin rename tests
+failed against the Linux-only binding. Two additional resource-limit tests cover
+Linux/Darwin with both unlimited and tighter inherited limits. These focused
+regressions are sufficient for the bounded platform branches; no property-based
+follow-up is required for this repair.
+
+| Command or check | Result |
+| --- | --- |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest tests.test_visual_review tests.test_packaging` | **39 passed**, including packaged worker/contract checks outside the checkout. |
+| Run all `tests.test_visual_review` cases through `uv run --locked --no-sync python` with `tempfile.tempdir` pointing at a synthetic symlinked parent | **32 passed**; the corresponding work-confinement case failed before the fixture repair. |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest discover -s tests` | **424 run, 423 passed, 1 skipped** (optional LibreOffice legacy `.ppt`). |
+| `git diff --check` | PASS. |
+
+Independent review then found a P2 regression: the reader's platform-dependent
+limitation list rejected intact packets produced under the other profile, and
+assessment results used reader-local disclosures. The new cross-profile test
+failed in both directions before the correction. Verification now accepts
+exactly the recognized base and macOS producer profiles independently of the
+reader; preparation snapshots the profile and assessment/export retain its
+bound disclosures. Unknown, incomplete, reordered and duplicated profiles
+remain unsupported. Legacy packets with the base profile remain accepted.
+
+Follow-up validation on Linux:
+
+| Command or check | Result |
+| --- | --- |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest tests.test_visual_review.VisualReviewTests.test_packet_limitations_travel_with_producer_profile tests.test_visual_review.VisualReviewTests.test_packet_rejects_unknown_or_incomplete_limitations` | **2 passed**; all four producer/reader profile combinations verify, assess and export, preserving original disclosures in results, transcription and provenance. Negative cases reach profile validation with freshly sealed synthetic manifests. |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest tests.test_visual_review tests.test_packaging` | **41 passed**. |
+| `UV_CACHE_DIR=/tmp/second-brain-uv-cache uv run --locked --no-sync python -m unittest discover -s tests` | **426 run, 425 passed, 1 skipped** (optional LibreOffice legacy `.ppt`). |
+| `git diff --check` | PASS. |
+
+Independent read-only re-review returned **PASS**, with the P2 defect closed
+and no remaining blocking source/test findings. It reviewed all five changed
+files, the profile matrix and negative tests, and the validation evidence;
+native macOS execution remains the explicit nonblocking concern.
+
+Native macOS execution remains unverified: Darwin API/resource calls were
+simulated on Linux. Rerun `uv run --locked --extra visual python -m unittest
+discover -s tests -v` on the user's Mac after transferring this patch. Poppler
+tests remain conditional on the explicitly selected executable being available.
+No dependency, lockfile, evidence contract, real project run, human approval,
+publication, or model/provider configuration changed.
+
+## Historical local visual-review checkpoint — engine 0.4.0, adapter 0.6.2
 
 Executed 2026-10-04 on Linux with synthetic inputs. The previous four fix/preparation commits were already committed with a clean tree before this increment. `visual-review prepare/verify/assess/export` now creates separate hash-bound raster review packets, validates explicit human element/gap dispositions, computes a declared-element match fraction and exports a traceable transcription. Existing frozen evidence and publication contracts remain unchanged. Linux resource controls and atomic no-replace rename are required for packet creation.
 

@@ -178,11 +178,11 @@ def _approved_release(config: Path, run_id: str | None = None) -> dict | None:
     if not any(isinstance(entry, dict) and entry.get("run_id") == run_id for entry in published):
         raise KBError("Release is absent from the publication history")
     release = inside(locations["approved"], run_id)
-    check_run(release, inside(release, "records.json"), stage2=True)
+    check_run(release, inside(release, "records.json"), stage2=True, historical=True)
     manifest = load_manifest(release)
     records = read_json(inside(release, "records.json"))
     review = read_json(inside(release, "review.json"))
-    contract(review, "review")
+    contract(review, "review", source=release / "review.json")
     if review["schema_version"] not in {"0.3", "0.4"} or review["decision"] != "approve" \
             or not review["reviewer"].strip() or not all(review["checks"].values()) \
             or review["project_id"] != project_id or manifest["project_id"] != project_id \
@@ -204,7 +204,7 @@ def _approved_release(config: Path, run_id: str | None = None) -> dict | None:
             or (triaged_segment_ids(records) and not review["segment_triage_acknowledged"]):
         raise KBError("Approved release audit or review gate changed")
     referrals = []
-    if records["schema_version"] == "0.5":
+    if records["schema_version"] in {"0.5", "0.6"}:
         if review["schema_version"] != "0.4":
             raise KBError("Routed release lacks routing approval")
         for filename, key in (("referrals.json", "referrals_sha256"),
@@ -219,7 +219,7 @@ def _approved_release(config: Path, run_id: str | None = None) -> dict | None:
             raise KBError("Approved outbox changed")
         referrals = routing["referrals"]
     bound_files = ["manifest.json", "records.json", "review.json", "review-report.md"]
-    if referrals or records["schema_version"] == "0.5":
+    if referrals or records["schema_version"] in {"0.5", "0.6"}:
         bound_files += ["referrals.json", "outbox.md"]
     segments = load_segment_inventory(release, manifest)
     result = {"project_id": project_id, "run_id": run_id, "release": release,
@@ -247,7 +247,7 @@ def _stable_pointer(origin: dict) -> None:
            for file, digest in origin["bindings"].items()) \
             or work_digest(read_work(origin["release"])) != origin["work_sha256"]:
         raise KBError("Approved release changed during intake; retry")
-    check_run(origin["release"], inside(origin["release"], "records.json"), stage2=True)
+    check_run(origin["release"], inside(origin["release"], "records.json"), stage2=True, historical=True)
 
 
 def load_approved_release(config: Path, run_id: str | None = None) -> dict | None:
@@ -403,7 +403,7 @@ def _capture(item: dict, review: dict, project: Path) -> None:
 def decide(config: Path, registry_path: Path, origin_config: Path, review_path: Path) -> dict:
     """Record an explicit human accept/decline/defer; acceptance only proposes work."""
     review = read_json(review_path)
-    contract(review, "intake-review")
+    contract(review, "intake-review", source=review_path)
     cfg, project, _ = load_project(config)
     registry = _registry(registry_path, cfg["project"]["id"])
     origin = _approved_release(origin_config)
@@ -438,7 +438,7 @@ def decide(config: Path, registry_path: Path, origin_config: Path, review_path: 
 def link_target(config: Path, link_path: Path) -> dict:
     """Audit an already published target claim using its own checked evidence."""
     review = read_json(link_path)
-    contract(review, "intake-link")
+    contract(review, "intake-link", source=link_path)
     target = _approved_release(config, review["target_run_id"])
     if target is None or review["target_review_sha256"] != target["review_sha256"]:
         raise KBError("Target release link is stale")

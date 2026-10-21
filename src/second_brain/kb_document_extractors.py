@@ -24,7 +24,7 @@ import tempfile
 import zipfile
 import zlib
 
-VERSION = "0.6.2"
+VERSION = "0.7.0"
 FORMATS = frozenset({".docx", ".ppt", ".pptx", ".pdf", ".csv", ".xlsx", ".html", ".eml", ".svg", ".png"})
 MIME_TYPES = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -208,6 +208,8 @@ def ooxml_parts(raw: bytes, b: Builder) -> dict:
 
 
 def read_docx(raw: bytes, b: Builder):
+    from .kb_docx_comments import emit_comments, prepare_comments
+
     parts = ooxml_parts(raw, b)
     if "word/document.xml" not in parts:
         raise ExtractionError("format_mismatch", "Not a DOCX package")
@@ -219,7 +221,9 @@ def read_docx(raw: bytes, b: Builder):
             raise ExtractionError("tracked_changes_require_review", "Resolve tracked changes in a reviewed copy before extraction")
         if any(e.tag in {ns + tag for tag in ("sdt", "txbxContent", "altChunk")} for e in root.iter()):
             raise ExtractionError("docx_structure_requires_export", "Content controls, text boxes or imported chunks require a reviewed export")
-    extras = sorted(k for k in parts if re.fullmatch(r"word/(comments\w*|footnotes|endnotes)\.xml", k))
+    comments = prepare_comments(parts, b, ExtractionError)
+    extras = sorted(k for k in parts if re.fullmatch(r"word/(comments\w*|footnotes|endnotes)\.xml", k)
+                    and k not in comments["parts"])
     if extras:
         b.warning("docx_ancillary_parts_not_extracted", ", ".join(extras))
     with zipfile.ZipFile(BytesIO(raw)) as archive:
@@ -261,6 +265,7 @@ def read_docx(raw: bytes, b: Builder):
                 continue
             visited.add(identity)
             walk(part, f"DOCX/section={s}/{kind}")
+    emit_comments(comments, document, b, walk, ExtractionError)
     b.warning("docx_visuals_not_extracted", "Images, drawing semantics, automatic numbering, fields and page layout are not fully reproduced")
 
 

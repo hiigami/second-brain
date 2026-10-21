@@ -1,5 +1,12 @@
 # Stage 2 workflow
 
+Targeted preparation is an explicitly authorized opt-in engine path described in
+ADRs 008–009. Operators supply a versioned run request with exact capture scope,
+purpose, packet policy and either explicit no-context or separately permitted
+prior context. Analysis-only work cannot replace approved project state. Refresh
+still follows the serial manual extraction, reconciliation, semantic review and
+human publication sequence below. Preparation never calls a model.
+
 ## Entry condition
 
 The operator has an approved local project workspace and approved UTF-8 source snapshots. Stage 1 is a source-fidelity prerequisite, not something this bundle claims to have performed. The real pilot is intentionally narrow enough to review end to end.
@@ -19,6 +26,32 @@ CONFIGURED
 ```
 
 This is an operational sequence implemented by separate CLI steps and human/assistant actions. It is not an autonomous scheduler or graph runtime. Commands do not schedule themselves, run in the background, or invoke a model.
+
+## Operator: targeted run preparation
+
+After authorizing exact membership and any context retention, supply `run-request`
+1.0 to `second-brain run create`. `--dry-run` checks path scope and requested prior
+context without writing or opening source content. `context: null` explicitly
+supports first runs; requested retrieval failure blocks before capture. Strict
+mixed-source isolation consumes reviewed hashed UTF-8 exports without opening
+their original references. Whole-file mode explicitly retains all selected bytes.
+
+The command freezes the request/purpose, captures selected evidence, prepares
+packets and exhaustive interval stubs, scans selected mentions, offers prior
+citation suggestions, and writes `work/assistant-briefing.md` and a reconciliation
+checklist. Hash receipts permit verified completed-stage resume only. Interrupted
+write-once stages require a new run id; never overwrite packets or recapture.
+The preparation handoff is inventory/context checking, not extraction or semantic
+validation. Continue serially using the prompts and records 0.6/referrals 1.1.
+
+`analysis_only` cannot prepare publication review or publish. `project_refresh`
+must revalidate retained claims with current evidence or propose explicitly
+reviewed removals. Ranked prior context cannot be current-run evidence. Context
+permission/freshness is checked prospectively before use/review/publication;
+historical verification uses frozen bindings and survives later foreign changes.
+After human publication, rebuild derived indexes separately. A stale-index or
+refresh failure never rolls back the successful project release. See the
+[CLI reference](docs/CONFIG_REFERENCE.md#targeted-run-preparation).
 
 ## Operator: configuration and capture
 

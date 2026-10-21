@@ -37,7 +37,9 @@ Adapter 0.6.0 also validates PNG compressed scanlines before accepting a capture
 
 The [visual reference catalog](docs/VISUAL_REFERENCE_CASES.md) pins synthetic originals, including dense HTML with ER and state diagrams. The [review template](templates/VISUAL_CAPABILITY_REVIEW.md) records actual access and human comparisons; no GLM visual capability or human acceptance is claimed from parser tests.
 
-While GLM is unavailable, `second-brain visual-review prepare/verify/assess/export` can produce local raster previews, retain explicit gaps, and bind a human comparison/transcription to original hashes. Use the optional uv `visual` extra and the [local review workflow](docs/LOCAL_VISUAL_REVIEW.md). This separate operator workflow leaves evidence adapter 0.6.2 and approval gates unchanged; GLM visual capability acceptance remains pending.
+While GLM is unavailable, `second-brain visual-review prepare/verify/assess/export` can produce local raster previews, retain explicit gaps, and bind a human comparison/transcription to original hashes. Use the optional uv `visual` extra and the [local review workflow](docs/LOCAL_VISUAL_REVIEW.md). This separate operator workflow leaves evidence capture and approval gates unchanged; GLM visual capability acceptance remains pending.
+
+Adapter 0.7.0 captures DOCX comment text, recorded authors/dates, reply links and current resolved flags with `--documents`. Missing status and resolution time remain unknown; annotations do not establish business approval. LibreOffice is unnecessary. See [the supported fields and fidelity limits](docs/CONFIG_REFERENCE.md).
 
 CSV remains raw text unless `--documents --csv-representation structured` is selected; `--csv-header first-row` is an explicit declaration. HTML tables now expose citable rows with source-stated column context. These row structures preserve text for review without deciding model relationships or status.
 

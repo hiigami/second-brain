@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "schema_version": {
-      "const": "0.5"
+      "const": "0.6"
     },
     "project_id": {
       "type": "string",
@@ -566,6 +566,127 @@
               ],
               "additionalProperties": false
             }
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "attribution": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "evidence_ref": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "class": {
+                  "enum": [
+                    "home",
+                    "R1",
+                    "R2",
+                    "R3",
+                    "R4",
+                    "unknown"
+                  ]
+                },
+                "project_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "evidence_ref",
+                "class",
+                "project_id",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "assertions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "enum": [
+                    "equivalent_to",
+                    "conflicts_with",
+                    "depends_on",
+                    "supersedes",
+                    "applies_to"
+                  ]
+                },
+                "target": {
+                  "type": "object",
+                  "properties": {
+                    "project_id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                    },
+                    "run_id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                    },
+                    "record_id": {
+                      "type": "string",
+                      "pattern": "^(REQ|DEC|UNC|INV)-[0-9]{3,6}$"
+                    }
+                  },
+                  "required": [
+                    "project_id",
+                    "run_id",
+                    "record_id"
+                  ],
+                  "additionalProperties": false
+                },
+                "evidence_refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "status": {
+                  "enum": [
+                    "observed",
+                    "interpretation",
+                    "proposal",
+                    "unresolved"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "type",
+                "target",
+                "evidence_refs",
+                "status",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -579,11 +700,63 @@
           "open_questions",
           "investigation",
           "events",
-          "cross_project"
+          "cross_project",
+          "aliases",
+          "attribution",
+          "assertions"
         ],
         "additionalProperties": false
       },
       "minItems": 0
+    },
+    "interval_coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "string",
+            "pattern": "^S-[a-f0-9]{24}$"
+          },
+          "representation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "start_line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "end_line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "disposition": {
+            "enum": [
+              "used",
+              "reviewed_no_record",
+              "triaged_out",
+              "deferred"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "segment_id",
+          "representation_sha256",
+          "start_line",
+          "end_line",
+          "disposition",
+          "note"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [
@@ -592,7 +765,8 @@
     "run_id",
     "coverage",
     "records",
-    "segment_coverage"
+    "segment_coverage",
+    "interval_coverage"
   ],
   "additionalProperties": false
 }

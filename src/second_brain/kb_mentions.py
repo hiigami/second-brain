@@ -7,7 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from .kb_check import load_manifest, load_segment_inventory
-from .kb_common import (KBError, contract, inside, json_bytes, json_sha, no_symlinks, read_json,
+from .kb_common import (KBError, contract, error_context, inside, json_bytes, json_sha, no_symlinks, read_json,
                        read_stable, run_cli, sha, validate_pattern, write_new)
 
 _TOKEN = re.compile(r"[^\W_][\w\u0300-\u036f]*", re.UNICODE)
@@ -38,7 +38,8 @@ def _alias_key(value: str) -> tuple[str, ...]:
 def load_registry(path: Path) -> dict:
     """Validate registry shape, alias identity, and descriptive ownership paths."""
     no_symlinks(path)
-    return validate_registry(read_json(path))
+    with error_context(path):
+        return validate_registry(read_json(path))
 
 
 def validate_registry(registry: dict) -> dict:
@@ -136,6 +137,11 @@ def build_mention_report(run: Path, registry: dict) -> dict:
     for segment in (segments or {}).get("segments", []):
         by_evidence[segment["evidence_id"]].append(segment)
     mentions = []
+    selected = None
+    if "targeted" in manifest:
+        from .kb_intervals import selected_ranges
+        from .kb_targeting import load_targeted
+        selected = selected_ranges(run, manifest, load_targeted(run, manifest))[0]
     for f in sorted(manifest["files"], key=lambda x: (x["source_id"], x["relative_path"])):
         raw = read_stable(inside(run, f["snapshot_path"]), manifest["limits"]["max_file_bytes"])
         expected = f["document"]["text_sha256"] if "document" in f else f["sha256"]
@@ -143,6 +149,8 @@ def build_mention_report(run: Path, registry: dict) -> dict:
             raise KBError(f"Snapshot integrity changed during mention scan: {f['evidence_id']}")
         lines = raw.decode("utf-8-sig").splitlines()
         for line_number, line in enumerate(lines, 1):
+            if selected is not None and not any(a <= line_number <= b for a,b in selected.get(f["evidence_id"], [])):
+                continue
             for match in _line_matches(line, index):
                 if len(mentions) >= _MAX_MENTIONS:
                     raise KBError("Mention scan exceeds 10,000 candidate occurrences")

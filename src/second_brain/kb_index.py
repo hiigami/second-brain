@@ -20,7 +20,7 @@ MAX_ENTRIES = 10000
 def _access(path: Path) -> dict:
     no_symlinks(path)
     access = read_json(path)
-    contract(access, "index-access")
+    contract(access, "index-access", source=path)
     if not access["authorized_by"].strip() or not access["reason"].strip() \
             or parse_ts(access["authorized_at"]) > datetime.now(timezone.utc) + timedelta(seconds=CLOCK_SKEW_SECONDS):
         raise KBError("Index access requires a named operator, reason, and non-future timestamp")
@@ -125,8 +125,8 @@ def _generation(data: dict) -> str:
     return "IDX-" + json_sha({k: v for k, v in data.items() if k != "generation_id"})[:24]
 
 
-def _validate_index(data: dict) -> None:
-    contract(data, "global-index")
+def _validate_index(data: dict, path: Path | None = None) -> None:
+    contract(data, "global-index", source=path)
     if len(data["releases"]) > MAX_RELEASES or len(data["entries"]) > MAX_ENTRIES:
         raise KBError("Index exceeds 1,000 releases or 10,000 entries; narrow the access set")
     if data["generation_id"] != _generation(data):
@@ -227,7 +227,7 @@ def build_index(access_path: Path, registry_path: Path, configs: list[Path], inc
         if before is not None:
             # Rebuild may repair an edited index, but must not overwrite an
             # unrelated file simply because its path was supplied.
-            contract(read_json(output), "global-index")
+            contract(read_json(output), "global-index", source=output)
         data = _snapshot(context, include_history)
         if (read_stable(output, LIMIT) if output.exists() else None) != before:
             raise KBError("Index changed during rebuild; retry")
@@ -245,7 +245,7 @@ def _verified(access_path: Path, registry_path: Path, configs: list[Path]) -> di
         raise KBError("Index rebuild is in progress; retry")
     before = read_stable(output, LIMIT)
     data = read_json(output)
-    _validate_index(data)
+    _validate_index(data, output)
     if data["access_sha256"] != json_sha(context["access"]) or data["registry_sha256"] != json_sha(context["registry"]):
         raise KBError("Index access or registry is stale; rebuild before querying")
     expected = _snapshot(context, data["include_history"])
@@ -261,43 +261,85 @@ def check_index(access_path: Path, registry_path: Path, configs: list[Path]) -> 
             "entry_count": len(data["entries"]), "include_history": data["include_history"]}
 
 
-def query_index(access_path: Path, registry_path: Path, configs: list[Path], text: str = "",
-                view: str = "current", project_id: str | None = None, kind: str | None = None,
-                epistemic_status: str | None = None, limit: int = 50) -> dict:
-    """Return bounded reviewed records only after fresh access and provenance checks."""
+def query_verified(data: dict, text: str = "", view: str = "current", project_id: str | None = None,
+                   kind: str | None = None, epistemic_status: str | None = None,
+                   limit: int = 50, expand_relations: int = 0, _all_results: bool = False) -> dict:
+    """Rank against one already verified generation; no cached access boundary."""
     if view not in {"current", "historical", "all"} or not 1 <= limit <= 1000 \
             or kind not in {None, "requirement", "decision", "uncertainty", "investigation"} \
-            or epistemic_status not in {None, "observed", "interpretation", "proposal", "unresolved"}:
-        raise KBError("Query view, filters, or result limit is invalid")
-    data = _verified(access_path, registry_path, configs)
+            or epistemic_status not in {None, "observed", "interpretation", "proposal", "unresolved"} \
+            or not 0 <= expand_relations <= 2:
+        raise KBError("Query view, filters, result limit or relationship budget is invalid")
     if view == "historical" and not data["include_history"]:
         raise KBError("Build with --include-history before historical lookup")
     projects = {p["project_id"]: p for p in data["projects"]}
     if project_id is not None and project_id not in projects:
         raise KBError("Query project is outside the explicit access set")
     releases = {(r["project_id"], r["run_id"]): r for r in data["releases"]}
-    terms = text.casefold().split()
-    matches = []
-    for entry in data["entries"]:
-        record = entry["record"]
-        searchable = "\n".join([record["title"], record["statement"], *record["open_questions"],
-                                 *(event["statement"] for event in record.get("events", []))]).casefold()
-        if (view != "all" and entry["visibility"] != view) or (project_id and entry["project_id"] != project_id) \
-                or (kind and record["kind"] != kind) or (epistemic_status and record["epistemic_status"] != epistemic_status) \
-                or not all(term in searchable for term in terms):
-            continue
-        matches.append({"project": projects[entry["project_id"]],
-                        "release": releases[(entry["project_id"], entry["run_id"])], "entry": entry})
-    return {"generation_id": data["generation_id"], "view": view, "include_history": data["include_history"],
-            "total_matches": len(matches), "results": matches[:limit],
-            "limitations": ["Human-reviewed snapshots can contain proposals and unresolved claims; review is not business approval.",
-                            "Historical selection and supported event dates do not establish current business state or source authority."]}
+    terms = sorted(set(text.casefold().split()))
+    def eligible(entry):
+        r = entry["record"]
+        return ((view == "all" or entry["visibility"] == view) and
+                (not project_id or entry["project_id"] == project_id) and
+                (not kind or r["kind"] == kind) and
+                (not epistemic_status or r["epistemic_status"] == epistemic_status))
+    pool = {e["key"]:e for e in data["entries"] if eligible(e)}
+    ranked = {}
+    for key, entry in pool.items():
+        r = entry["record"]
+        fields = {"title":(r["title"].casefold(),4), "aliases":(" ".join(r.get("aliases",[])).casefold(),5),
+                  "statement":(r["statement"].casefold(),2), "questions":(" ".join(r["open_questions"]).casefold(),1),
+                  "events":(" ".join(e["statement"] for e in r.get("events",[])).casefold(),1)}
+        reasons, score = [], 0
+        for term in terms:
+            hits = [name for name,(content,weight) in fields.items() if term in content]
+            if not hits:
+                break
+            points = sum(fields[name][1] for name in hits)
+            reasons.append({"term":term,"fields":hits,"points":points})
+            score += points
+        else:
+            ranked[key] = {"entry":entry,"ranking_score":score,"ranking_reasons":reasons,"relationship_hops":0}
+    frontier = sorted(ranked)
+    for hop in range(1,expand_relations+1):
+        following = []
+        for key in frontier:
+            entry = pool[key]
+            neighbors = [f"{entry['project_id']}:{entry['run_id']}:{edge['target']}" for edge in entry["record"]["relations"]]
+            neighbors += [f"{a['target']['project_id']}:{a['target']['run_id']}:{a['target']['record_id']}"
+                          for a in entry["record"].get("assertions",[]) if a["status"] in {"observed","interpretation"}]
+            for target in sorted(set(neighbors)):
+                if target in pool and target not in ranked:
+                    ranked[target] = {"entry":pool[target],"ranking_score":0,"ranking_reasons":[{"via":key,"reason":"reviewed_relationship"}],"relationship_hops":hop}
+                    following.append(target)
+        frontier = sorted(set(following))
+    matches = sorted(ranked.values(),key=lambda r:(r["relationship_hops"],-r["ranking_score"],r["entry"]["key"]))
+    results = [{**r,"project":projects[r["entry"]["project_id"]],
+                "release":releases[(r["entry"]["project_id"],r["entry"]["run_id"])]} for r in (matches if _all_results else matches[:limit])]
+    return {"generation_id":data["generation_id"],"ranking_version":"1","query_terms":terms,
+            "view":view,"include_history":data["include_history"],"total_matches":len(matches),
+            "omitted_count":max(0,len(matches)-limit),"results":results,
+            "limitations":["Reviewed proposals and uncertainties retain their status; ranking is lexical, not semantic.",
+                           "Relationship expansion respects view/project/kind/status filters and never establishes active state."]}
+
+
+def query_batch(access_path: Path, registry_path: Path, configs: list[Path], queries: list[str], **filters) -> dict:
+    data = _verified(access_path,registry_path,configs)
+    return {"generation_id":data["generation_id"], "queries":[query_verified(data,text=q,**filters) for q in queries]}
+
+
+def query_index(access_path: Path, registry_path: Path, configs: list[Path], text: str = "",
+                view: str = "current", project_id: str | None = None, kind: str | None = None,
+                epistemic_status: str | None = None, limit: int = 50, expand_relations: int = 0) -> dict:
+    """Return ranked reviewed records only after full fresh access/provenance checks."""
+    data = _verified(access_path,registry_path,configs)
+    return query_verified(data,text,view,project_id,kind,epistemic_status,limit,expand_relations)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("build", "check", "query"):
+    for name in ("build", "check", "query", "assertions"):
         command = commands.add_parser(name)
         command.add_argument("--access", type=Path, required=True)
         command.add_argument("--registry", type=Path, required=True)
@@ -311,6 +353,7 @@ def main() -> int:
             command.add_argument("--kind", choices=("requirement", "decision", "uncertainty", "investigation"))
             command.add_argument("--epistemic-status", choices=("observed", "interpretation", "proposal", "unresolved"))
             command.add_argument("--limit", type=int, default=50)
+            command.add_argument("--expand-relations",type=int,default=0)
     args = parser.parse_args()
     if args.command == "build":
         data = build_index(args.access, args.registry, args.project_config, args.include_history)
@@ -318,9 +361,12 @@ def main() -> int:
                   "entry_count": len(data["entries"]), "release_count": len(data["releases"])}
     elif args.command == "check":
         result = check_index(args.access, args.registry, args.project_config)
+    elif args.command == "assertions":
+        from .kb_reconciliation import assertion_views
+        result = assertion_views(_verified(args.access, args.registry, args.project_config))
     else:
         result = query_index(args.access, args.registry, args.project_config, args.text,
-                             args.view, args.project, args.kind, args.epistemic_status, args.limit)
+                             args.view, args.project, args.kind, args.epistemic_status, args.limit, args.expand_relations)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 

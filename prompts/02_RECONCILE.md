@@ -2,6 +2,20 @@
 
 Inputs: candidate records, manifest/packets, applicable project authority policy, and optionally the prior approved record snapshot.
 
+Targeted runs distinguish analysis-only investigation from complete project refresh.
+An analysis cannot publish a replacement snapshot. Review the reconciliation
+checklist/report for retained, revised, removed, unsupported and unresolved claims.
+Revalidate retained meaning with current-run evidence; propose removals explicitly
+for human judgment. Scope narrowing is not deletion or retirement.
+
+The operator may use `reanchor --citation-only` for routed records 0.5/0.6. These
+are exact-quote suggestions, with routing/aliases/assertions cleared and attribution
+pending. Reassess every alias/manual reference and disclosure; do not reuse an old
+routing approval. Records 0.6 qualified assertions remain owned by this project,
+carry exact parent evidence indexes and semantic status, and never modify target
+knowledge. Preserve unavailable/historical references, opposing assertions and
+supersession cycles. Dates and release order cannot determine applicability.
+
 Deduplicate equivalent claims without merging distinct requirements. Retain stable record ids for unchanged meanings. Reanchor retained knowledge to evidence available in the current run: the operator runs tools/kb_reanchor.py, which writes RUN_DIR/work/reanchored-records.json and reanchor-report.json. Read every moved, ambiguous, or changed-file citation in context; re-extract records the report lists as dropped instead of silently omitting them. A newer source or code implementation does not automatically supersede a requirement.
 
 For records 0.4, review every retained event id and its `event_date`/`effective_date` after re-anchoring. The report lists dropped event ids when date support disappears; re-extract or keep the event absent with an explicit unresolved question. A later capture does not make an event later. Do not turn overlapping date ranges or conflicting alternatives into a total chronology, and do not treat a later effective date as proof of approval or supersession.

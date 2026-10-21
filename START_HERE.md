@@ -1,5 +1,15 @@
 # Start here — Stage 2
 
+For an explicitly authorized targeted preparation, supply a `run-request` 1.0
+and use `second-brain run create --dry-run` before capture. See
+[targeted preparation](docs/CONFIG_REFERENCE.md#targeted-run-preparation).
+Choose analysis-only for narrow investigation or project-refresh for a complete
+snapshot. Strict isolation needs reviewed hashed UTF-8 exports; the engine never
+opens their original references. Prior context needs separate permission for
+the target run and eventual release audit copies. Preparation stops at manual
+extraction. Fixed GLM behavior, semantic review and human approval/publication
+remain required. Real capture, disclosure and pilot acceptance are separate.
+
 This document is an executable procedure. Every step states either the exact
 command to run (with exact parameters) or the exact skill prompt to give. Steps
 are numbered; each step ends with **→ Next**, which tells you exactly which

@@ -1,6 +1,39 @@
 # Stage 2 contracts
 
-Versions: `project.json` 0.1 (frozen), optional source scope 1.0, project registry 1.1 (1.0 readable), manifest 0.1 (additively extended), segment inventory 1.0, records 0.5 (0.1–0.4 readable), review 0.4 for routed runs (0.1–0.3 readable), referral intake/review/link 1.0, index access/global index 1.0. Engine version 0.4.0.
+## Targeted preparation contracts (opt-in)
+
+See [ADR 008](docs/architecture/adr/008-targeted-run-scope-and-coverage.md) and
+[ADR 009](docs/architecture/adr/009-project-assertions-and-pinned-context.md).
+`project.json` remains 0.1. Additive `manifest.targeted` 1.0 binds a frozen
+`run-request` 1.0, stable policy digest, run purpose and optional context digest.
+Legacy manifests retain their original semantics. New targeted profiles require
+records 0.6 and referrals 1.1; exact legacy schemas retain records 0.5/referrals 1.0.
+Records 0.6 add interval coverage, per-citation attribution, aliases and qualified
+project-owned assertions. No newer schema may bypass the existing citation,
+segment, event, routing, human review or publication gates.
+
+Interval rows partition each frozen segment, in order, without gaps or overlaps.
+They bind representation hashes; rollups use used > deferred > triaged_out >
+reviewed_no_record. Every citation is covered by used intervals and every used
+interval intersects a citation. Unselected intervals cannot claim reading.
+Deferred intervals block Stage 2. Coverage does not certify semantic reading.
+Referral quotes must remain entirely within selected passages and cannot overlap
+triaged or deferred intervals; whole-file/segment rollups do not override this.
+
+`analysis_only` cannot prepare publication review or publish, including through
+direct entry points. `project_refresh` is a complete snapshot: all retained claims
+need current evidence and removed ids need explicit human acknowledgement.
+Whole-file authorization expressly includes unrelated bytes; strict isolation
+consumes hashed reviewed UTF-8 exports and never reads their original references.
+
+`context-permission` 1.0 covers run and eventual release destinations, quotes,
+briefings and retained audit copies. `run-context` 1.0 freezes prior qualified
+records and provenance, queries/ranking version, budgets/omissions and selected
+dependencies. Prospective checks use live permission/freshness; historical checks
+use frozen integrity only. Context is untrusted prior knowledge, never new-run
+evidence. Preparation receipts permit only verified completed-stage resume.
+
+Versions: `project.json` 0.1 (frozen), optional source scope 1.0, project registry 1.1 (1.0 readable), manifest 0.1 (additively extended), segment inventory 1.0, records 0.6 (0.1–0.5 readable), review 0.4 for routed runs (0.1–0.3 readable), referrals 1.1 (1.0 readable), referral intake/review/link 1.0, index access/global index 1.0. Engine version 0.4.0. Targeted run-request, context-permission and run-context are 1.0 opt-in contracts.
 
 The machine-readable contracts are `src/second_brain/schemas/*.schema.json`; superseded versions whose required fields changed are kept in `src/second_brain/schemas/legacy/<name>-<version>.schema.json` and selected by the document's `schema_version`. The tools validate a fixed subset of JSON Schema keywords and **reject any other keyword**, so a schema edit can never be silently ignored. They then enforce cross-file invariants. These scripts are not a general-purpose JSON Schema implementation. External Draft 2020-12 validators can also consume the schemas.
 
@@ -124,6 +157,10 @@ Records 0.3 add `segment_id` and `representation_sha256` to every citation and `
 Adapter 0.5.0 adds `diagram_label`, `diagram_caption`, `vector_geometry`, `image_region`, `image_annotation`, and `embedded_asset` segment types. SVG text/attributes and PNG dimensions/metadata are source structure; PNG IDAT pixels are not decoded, SVG rendering is not verified, and embedded image meaning remains unavailable. A quote from these derived segments proves only the captured source text, not visibility, legibility, image content, relationship direction/cardinality, or agreement with a caption. The original bytes remain frozen for [manual fidelity comparison](docs/VISUAL_FIDELITY_REVIEW.md); the warning/segment integrity checks do not certify visual fidelity.
 
 Adapter 0.6.0 additionally validates PNG IDAT zlib and packed scanline/filter structure within the worker budget. It does not reconstruct pixel values, identify visual regions beyond the canvas, or perform OCR. The changed adapter version is frozen in `manifest.documents`; historical 0.5.0 evidence remains verifiable and a cross-version delta is incomparable.
+
+Adapter 0.7.0 captures DOCX comments as citable `unclassified` metadata and paragraph/table spans. Locators identify the actual relationship-selected comment part and recorded comment ID. Metadata preserves recorded author, initials, raw `date`, last-paragraph ID, optional durable ID and raw `date_utc`; these are document annotations, not authenticated identities, business event dates, or approval. Reply parents come only from validated extended-comment links to the last paragraph. A matching `commentEx` supplies the current per-comment `resolved` flag: omitted `done` defaults to false; absent extended metadata leaves the flag and root/reply classification unknown. Replies do not inherit their parent's flag. `status_basis`, raw flags and metadata-part names retain the derivation. `resolved_at` is always null because no supported field establishes resolution time or history. Explicit anchor markers receive paragraph/node locators; target text is not inferred.
+
+Modern follow-up placeholders retain metadata but their bodies remain unavailable. Unsupported extensions, text-bearing inline wrappers, unlinked comment parts and missing/ambiguous targets produce explicit gaps. Duplicate/ambiguous IDs, dangling/cyclic parents, malformed supported metadata and exceeded budgets block extraction without accepting truncated output. Date strings are validated against the supported four-digit-year ISO date-time profile and retain their spelling; timezone-free `date` gains no timezone, while `dateUtc` has UTC meaning by its attribute definition. Comment bodies use the existing paragraph/table walker and keep its visual/layout limitations. Frozen 0.6.2 artifacts remain unchanged and verifiable; new captures use 0.7.0 and cross-version deltas remain incomparable. See [ADR 007](docs/architecture/adr/007-docx-comment-evidence.md).
 
 Records 0.4 add a required `events` array to each record while retaining records 0.3 segment-bound evidence and coverage. An event has a stable `EVT-...` id, statement, `evidence_refs` pointing to exact citations on its parent record, and an `event_date`; `effective_date` is optional. Date status is `known`, `approximate`, `unknown`, or `conflicting`. Known/approximate dates carry a value and precision (`year`, `month`, `day`, `minute`, or `second`); an optional same-precision `end` is an inclusive range. Timestamps include an offset, so a date-only value is never interpreted as an event at midnight. Approximate, unknown, and conflicting dates require explanatory notes; conflicts retain separately cited alternatives. `relative_to_anchor` requires a cited anchor value and derivation note. The checker verifies syntax, reference bounds, interval order, and variant consistency, not the claim's semantic support. Re-anchoring remaps event citation indexes and drops an event if any required support disappears, marking its record degraded. Older records remain readable without event claims. See [ADR 003](docs/architecture/adr/003-evidence-linked-event-dates.md).
 

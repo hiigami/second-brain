@@ -3,7 +3,7 @@ import html
 from pathlib import Path
 
 from .kb_check import load_segment_inventory
-from .kb_common import inside, read_json, read_stable
+from .kb_common import inside, json_sha, read_json, read_stable
 from .kb_event_time import event_date_label
 
 
@@ -138,6 +138,17 @@ def render_review_report(run: Path, manifest: dict, records: dict, check: dict,
         if c["disposition"] == "triaged_out":
             potential.append(f"- **Review:** segment `{c['segment_id']}` was triaged out. Verify omission is acceptable.")
     out += potential or ["No automatic potential blockers identified; semantic and fidelity review is still required."]
+    if "targeted" in manifest:
+        from .kb_reconciliation import reconciliation_report
+        reconciliation = reconciliation_report(run, manifest, records, prior_records, prior_manifest)
+        out += ["", "## Complete-snapshot reconciliation", ""]
+        for row in reconciliation["rows"]:
+            out += [f"- `{row['record_id']}`: {_inline(row['status'])}; {_inline(row['action'])}. "
+                    f"Unsupported prior citations: {_inline(row['unsupported_prior_citations'])}; unresolved: {row['unresolved']}."]
+    for hint in check.get("assertion_hints", []):
+        out += [f"- **Project-owned assertion:** `{hint['owner_record_id']}` {_inline(hint['type'])} "
+                f"{_inline(hint['target'])}; {_inline(hint['status'])}; {_inline(hint['target_integrity'])}. "
+                "Verify direction, applicability and conflicts; no target record is changed."]
     out += ["", "## Record and change review", ""]
     for rid in sorted(set(now) | set(old)):
         current, former = now.get(rid), old.get(rid)
@@ -228,7 +239,7 @@ def render_review_report(run: Path, manifest: dict, records: dict, check: dict,
                                     "Question: do cited lines support this date and qualification? "
                                     "Action: retain uncertainty until resolved by evidence and human review.")
     out += temporal or ["No non-known event dates recorded; this does not prove date accuracy."]
-    if records.get("schema_version") == "0.5":
+    if records.get("schema_version") in {"0.5", "0.6"}:
         routing = read_json(inside(run, "proposals/referrals.json"))
         scan = read_json(inside(run, "work/mentions.json"))
         assessments = {a["mention_id"]: a for a in routing["assessments"]}
@@ -258,10 +269,22 @@ def render_review_report(run: Path, manifest: dict, records: dict, check: dict,
                                  {"evidence_id": hit["evidence_id"], "segment_id": segment["segment_id"],
                                   "start_line": hit["line"], "end_line": hit["line"],
                                   "quote": hit["line_text"]})
+        for manual in routing.get("manual_mentions", []):
+            mid = "M-" + json_sha(["manual", manual["source"], manual["target_project_id"]])[:24]
+            assessment = assessments[mid]
+            out += [f"### {mid} · manual reference · {_inline(assessment['class'])}", "",
+                    f"Target: {_inline(manual['target_project_id'])}. Reason: {_inline(manual['reason'])}. "
+                    f"Assessment: {_inline(assessment['reason'])}; {_inline(assessment['disposition'])}.", ""]
+            out += _citation(run, run, manifest, files, segments, manual["source"])
     else:
         out += ["", "Project routing is not assessed automatically. Check whether any cited passage concerns "
                "another project before approving home-project knowledge.", ""]
     out += ["## Triaged inputs", ""]
+    for row in records.get("interval_coverage", []):
+        if row["disposition"] == "triaged_out":
+            out += [f"- **Unread interval:** `{row['segment_id']}` lines {row['start_line']}–{row['end_line']}; "
+                    f"method: {_inline(row['method'])}. Check missing headings, labels and qualifiers; "
+                    "explicitly acknowledge interval triage through the containing segment."]
     triaged = [c for c in records["coverage"] if c["disposition"] == "triaged_out"]
     for item in sorted(triaged, key=lambda c: c["evidence_id"]):
         f = files[item["evidence_id"]]

@@ -29,8 +29,21 @@ unavailable until an operator supplies a separately reviewed PDF export. The too
 does not invoke LibreOffice, execute macros/formulas, fetch linked resources, or
 perform OCR or visual-semantic interpretation. Rendering takes place in a
 short-lived safe-path worker; budgets and isolation are defense in depth, not a
-general hostile-file sandbox. This increment requires Linux resource controls
-and atomic no-replace rename support; unsupported hosts do not create packets.
+general hostile-file sandbox. The initial increment required Linux resource
+controls and atomic no-replace rename support. The macOS compatibility repair
+uses native `renamex_np` with `RENAME_EXCL` for the same no-overwrite guarantee,
+retains CPU/file-size/time limits and input/renderer budgets, and discloses that
+it omits the fixed address-space cap on macOS. Linux retains that cap; both
+platforms preserve tighter inherited limits. Other hosts do not create packets.
+Readers accept either recognized producer limitation profile independently of
+their own platform. Assessment results and exported provenance retain the
+packet's bound limitations; unknown or incomplete profiles remain unsupported.
+Native macOS validation remains pending; Linux tests simulate the Darwin API
+and exercise symlinked temporary-directory behavior.
+The Darwin binding follows Apple's [rename declarations and flags](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/stdio.h)
+and [exclusive-rename regression](https://github.com/apple-oss-distributions/xnu/blob/main/tests/rename_excl.c).
+Apple's [resource-limit implementation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_resource.c)
+can reject an address-space limit below current virtual-memory usage.
 
 Human assessments bind the exact packet manifest and item set, compare material
 elements with the originals, retain regions, transcriptions, omissions and

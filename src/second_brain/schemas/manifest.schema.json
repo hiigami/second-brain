@@ -40,17 +40,33 @@
       "description": "Versioned engine-owned capture inputs, frozen for runs created with tool 0.2.1 or later. Historical runs omit this field and use the fixed legacy lookup.",
       "type": "object",
       "properties": {
-        "version": {"const": "1"},
+        "version": {
+          "const": "1"
+        },
         "supported_extensions": {
-          "type": "array", "minItems": 1, "uniqueItems": true,
-          "items": {"type": "string", "pattern": "^\\.[a-z0-9]+$"}
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^\\.[a-z0-9]+$"
+          }
         },
         "secret_patterns": {
-          "type": "array", "minItems": 1, "uniqueItems": true,
-          "items": {"type": "string", "minLength": 1}
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
-      "required": ["version", "supported_extensions", "secret_patterns"],
+      "required": [
+        "version",
+        "supported_extensions",
+        "secret_patterns"
+      ],
       "additionalProperties": false
     },
     "config_snapshot": {
@@ -60,21 +76,41 @@
       "description": "Present only when an additive source-scope sidecar was captured. The named snapshot is bound to the scope fingerprint.",
       "type": "object",
       "properties": {
-        "path": {"const": "source-scope.snapshot.json"},
-        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        "path": {
+          "const": "source-scope.snapshot.json"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
       },
-      "required": ["path", "sha256"],
+      "required": [
+        "path",
+        "sha256"
+      ],
       "additionalProperties": false
     },
     "segment_inventory": {
       "description": "Frozen v1 locators and extraction issues for engine 0.4.0 runs.",
       "type": "object",
       "properties": {
-        "path": {"const": "segments.snapshot.json"},
-        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-        "count": {"type": "integer", "minimum": 0}
+        "path": {
+          "const": "segments.snapshot.json"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
-      "required": ["path", "sha256", "count"],
+      "required": [
+        "path",
+        "sha256",
+        "count"
+      ],
       "additionalProperties": false
     },
     "documents": {
@@ -85,7 +121,8 @@
           "const": true
         },
         "adapter_version": {
-          "type": "string", "minLength": 1
+          "type": "string",
+          "minLength": 1
         },
         "extensions": {
           "type": "array",
@@ -117,8 +154,20 @@
           "type": "string",
           "minLength": 1
         },
-        "csv_representation": {"type": "string", "enum": ["raw", "structured"]},
-        "csv_header": {"type": "string", "enum": ["none", "first-row"]},
+        "csv_representation": {
+          "type": "string",
+          "enum": [
+            "raw",
+            "structured"
+          ]
+        },
+        "csv_header": {
+          "type": "string",
+          "enum": [
+            "none",
+            "first-row"
+          ]
+        },
         "timeout_seconds": {
           "type": "integer",
           "minimum": 1
@@ -258,12 +307,31 @@
             "description": "Versioned identity of the quotable text; mandatory for engine 0.4.0 runs. Derived text also binds extractor and parser versions and options.",
             "type": "object",
             "properties": {
-              "version": {"const": "1"},
-              "kind": {"type": "string", "enum": ["source_text", "derived_text"]},
-              "text_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-              "identity_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+              "version": {
+                "const": "1"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "source_text",
+                  "derived_text"
+                ]
+              },
+              "text_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "identity_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
             },
-            "required": ["version", "kind", "text_sha256", "identity_sha256"],
+            "required": [
+              "version",
+              "kind",
+              "text_sha256",
+              "identity_sha256"
+            ],
             "additionalProperties": false
           },
           "bytes": {
@@ -796,6 +864,56 @@
       "type": "integer",
       "minimum": 1,
       "description": "Per-project capture order; authoritative over created_at for ordering."
+    },
+    "targeted": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": "1.0"
+        },
+        "request_path": {
+          "const": "run-request.snapshot.json"
+        },
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "purpose": {
+          "enum": [
+            "analysis_only",
+            "project_refresh"
+          ]
+        },
+        "context_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "config_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "version",
+        "request_path",
+        "request_sha256",
+        "policy_sha256",
+        "purpose",
+        "context_sha256",
+        "config_path"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

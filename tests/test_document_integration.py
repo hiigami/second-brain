@@ -236,7 +236,7 @@ class DocumentRunTests(unittest.TestCase):
             return result.metadata, result.text
 
         files = {"values.csv": b"Amount,Status\n10,pending\n"}
-        for version in ("0.6.0", "0.6.1"):
+        for version in ("0.6.0", "0.6.1", "0.6.2"):
             with self.subTest(version=version):
                 suffix = version.replace(".", "-")
                 with patch("kb_document_extractors.VERSION", version), \
@@ -255,6 +255,80 @@ class DocumentRunTests(unittest.TestCase):
                 self.assertFalse(new["delta"]["compatible"])
                 self.assertEqual((base / "manifest.json").read_bytes(), old_manifest)
                 self.assertNotEqual(old["files"][0]["evidence_id"], new["files"][0]["evidence_id"])
+
+    @unittest.skipUnless(HAS_DOCX, "python-docx is required")
+    def test_comment_only_capture_packets_and_exact_segment_citations(self):
+        try:
+            from test_docx_comments import comment_docx
+        except ImportError:
+            from tests.test_docx_comments import comment_docx
+        run, manifest = self.new_run({"annotations.docx": comment_docx(body=False, metadata={"extended": [
+            {"paraId": "00000001", "done": "true"},
+            {"paraId": "00000002", "paraIdParent": "00000001"}]})}, "comment-only")
+        self.assertEqual(manifest["status"], "ready")
+        self.assertEqual(check_run(run)["status"], "passed")
+        file = manifest["files"][0]
+        inventory_data = json.loads((run / "segments.snapshot.json").read_text())
+        segments = inventory_data["segments"]
+        selected = [s for s in segments if s["original_locator"].endswith("/comment=0/metadata")
+                    or s["original_locator"].endswith("/comment=1/body/block=1/paragraph")]
+        self.assertEqual(len(selected), 2)
+        lines = (run / file["snapshot_path"]).read_text().splitlines()
+        quotes = ["\n".join(lines[s["line_start"] - 1:s["line_end"]]) for s in selected]
+        self.assertEqual(json.loads(quotes[0])["resolved"], True)
+        self.assertEqual(quotes[1], "Reply text")
+        records = {"schema_version": "0.3", "project_id": manifest["project_id"], "run_id": manifest["run_id"],
+                   "coverage": [{"evidence_id": file["evidence_id"], "disposition": "used", "note": "Synthetic annotation citation."}],
+                   "segment_coverage": [{"segment_id": s["segment_id"], "disposition": "used" if s in selected else "reviewed_no_record",
+                                         "note": "Synthetic source read in full."} for s in segments],
+                   "records": [{"id": "REQ-001", "kind": "requirement", "title": "Recorded annotation",
+                                "statement": "The synthetic annotation records a resolved flag and reply text.",
+                                "epistemic_status": "observed",
+                                "evidence": [{"evidence_id": file["evidence_id"], "segment_id": s["segment_id"],
+                                              "representation_sha256": s["representation_sha256"],
+                                              "start_line": s["line_start"], "end_line": s["line_end"], "quote": quote}
+                                             for s, quote in zip(selected, quotes)],
+                                "relations": [], "open_questions": [], "investigation": None}]}
+        candidate = run / "proposals/records.json"
+        candidate.write_text(json.dumps(records))
+        self.assertEqual(check_run(run, candidate, stage2=True)["status"], "passed")
+        packets = build_packets(run)
+        packet_segments = {sid for packet in packets["packets"] for sid in packet["segment_ids"]}
+        self.assertTrue({s["segment_id"] for s in selected} <= packet_segments)
+        self.assertTrue(any(i["code"] == "docx_comment_resolution_history_unavailable" and i["status"] == "unavailable"
+                            for i in inventory_data["issues"]))
+        records["records"][0]["evidence"][1]["quote"] = "Invented reply"
+        candidate.write_text(json.dumps(records))
+        with self.assertRaisesRegex(KBError, "Quote differs from exact frozen lines"):
+            check_run(run, candidate, stage2=True)
+
+    @unittest.skipUnless(HAS_DOCX, "python-docx is required")
+    def test_historical_docx_without_comment_extraction_remains_frozen(self):
+        from kb_document_extractors import extract_bytes
+        try:
+            from test_docx_comments import comment_docx
+        except ImportError:
+            from tests.test_docx_comments import comment_docx
+
+        def historical_adapter(tmp, source_path, name, raw, options, timeout_seconds):
+            # Simulate the historical adapter's documented omission of comments.
+            with patch("second_brain.kb_docx_comments.prepare_comments", return_value={"parts": set(), "records": []}):
+                result = extract_bytes(raw, name)
+            return result.metadata, result.text
+
+        files = {"thread.docx": comment_docx()}
+        with patch("kb_document_extractors.VERSION", "0.6.2"), \
+                patch("kb_inventory.extract_document_snapshot", side_effect=historical_adapter):
+            base, old = self.new_run(files, "comments-old")
+        original = {path: (base / path).read_bytes() for path in ("manifest.json", "segments.snapshot.json", old["files"][0]["snapshot_path"])}
+        current, new = self.new_run(files, "comments-new", baseline=base)
+        self.assertEqual(check_run(base)["status"], "passed")
+        self.assertEqual(check_run(current)["status"], "passed")
+        self.assertFalse(new["delta"]["compatible"])
+        self.assertNotIn("Reply text", original[old["files"][0]["snapshot_path"]].decode())
+        self.assertIn("Reply text", (current / new["files"][0]["snapshot_path"]).read_text())
+        for path, data in original.items():
+            self.assertEqual((base / path).read_bytes(), data)
 
     def test_visual_metadata_tampering_is_rejected(self):
         self.run, self.manifest = self.new_run(
